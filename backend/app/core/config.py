@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     
     # CORS
-    allowed_origins: str = "http://localhost:3000,http://localhost:8080"
+    allowed_origins: str = "http://192.168.0.87:3000,http://localhost:8080"
     
     # Rate Limiting
     rate_limit_per_minute: int = 60
@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     def get_allowed_origins(self) -> List[str]:
         if self.allowed_origins:
             return [origin.strip() for origin in self.allowed_origins.split(",")]
-        return ["http://localhost:3000", "http://localhost:8080"]
+        return ["http://192.168.0.87:3000", "http://localhost:8080"]
     
     class Config:
         env_file = ".env"
