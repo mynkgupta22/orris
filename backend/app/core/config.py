@@ -27,9 +27,24 @@ class Settings(BaseSettings):
     
     # Google Drive
     google_drive_folder_id: str = ""
+    google_service_account_path: str = ""
+    evidev_data_folder_id: str = ""
     
     # OpenAI
     openai_api_key: str = ""
+    
+    # Vector Database
+    qdrant_host: str = "localhost"
+    qdrant_port: str = "6333"
+    qdrant_collection_name: str = "orris_rag"
+    
+    # Embeddings
+    nomic_api_key: str = ""
+    
+    # Document Processing
+    chunk_size: str = "800"
+    chunk_overlap: str = "50"
+    temp_dir: str = "/tmp"
     
     # CORS
     allowed_origins: str = "http://192.168.0.87:3000,http://localhost:8080"
