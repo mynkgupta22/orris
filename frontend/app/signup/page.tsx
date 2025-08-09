@@ -30,6 +30,7 @@ export default function SignupPage() {
   const validateForm = () => {
     const errors: Record<string, string> = {}
     
+    
     if (!formData.firstName.trim()) errors.firstName = 'First name is required'
     if (!formData.lastName.trim()) errors.lastName = 'Last name is required'
     if (!formData.email.trim()) errors.email = 'Email is required'
