@@ -288,7 +288,7 @@ export default function DocumentIntelligenceDashboard() {
                             </div>
                           )}
                           <p className="text-xs text-gray-400 mt-1">
-                            {doc.lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {doc.lastSync.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()}
                           </p>
                         </div>
                       </div>

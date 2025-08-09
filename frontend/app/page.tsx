@@ -18,10 +18,6 @@ export default function LandingPage() {
               <span className="text-xl font-semibold text-gray-900">Orris</span>
             </div>
             <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-gray-600 hover:text-gray-900 transition-colors">Features</a>
-              <a href="#security" className="text-gray-600 hover:text-gray-900 transition-colors">Security</a>
-              <a href="#pricing" className="text-gray-600 hover:text-gray-900 transition-colors">Pricing</a>
-              <Link href="/chat" className="text-gray-600 hover:text-gray-900 transition-colors">Chat</Link>
               <Link href="/login">
                 <Button variant="ghost" className="text-gray-600">Sign In</Button>
               </Link>

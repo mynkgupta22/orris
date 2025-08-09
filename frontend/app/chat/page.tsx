@@ -7,6 +7,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Brain, Send, Shield, Clock, FileText, User, Bot, Menu, Search, LogOut, Lock } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useAuthStore } from '@/lib/stores/auth'
 
 interface Message {
   id: string
@@ -24,6 +26,9 @@ interface ChatHistory {
 }
 
 export default function ChatInterface() {
+  const router = useRouter()
+  const { logout } = useAuthStore()
+  
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -161,7 +166,14 @@ export default function ChatInterface() {
             </div>
           </div>
           
-          <Button variant="ghost" className="w-full justify-start text-gray-600">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-gray-600"
+            onClick={async () => {
+              await logout();
+              router.push('/login');
+            }}
+          >
             <LogOut className="w-4 h-4 mr-3" />
             Sign Out
           </Button>
