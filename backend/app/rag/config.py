@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,7 +23,7 @@ class Config:
     TEMP_DIR = os.getenv('TEMP_DIR', '/tmp')
     
     # Embedding
-    EMBEDDING_DIMENSION = 768  # nomic-embed-text dimension
+    EMBEDDING_DIMENSION = 1024  # BGE-M3 embedding dimension
     
     @classmethod
     def validate(cls):
@@ -42,3 +43,22 @@ class Config:
             raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
         
         return True
+
+
+# Lightweight settings object for ingestion/indexing utilities that expect it
+@dataclass
+class QdrantSettings:
+    host: str
+    port: int
+    api_key: str | None
+    collection_name: str
+
+
+def load_qdrant_config() -> QdrantSettings:
+    """Compatibility helper for modules importing load_qdrant_config."""
+    return QdrantSettings(
+        host=Config.QDRANT_HOST,
+        port=Config.QDRANT_PORT,
+        api_key=os.getenv("QDRANT_API_KEY"),
+        collection_name=Config.QDRANT_COLLECTION_NAME,
+    )

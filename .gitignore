@@ -80,3 +80,8 @@ Thumbs.db
 
 # Alembic
 alembic/versions/__pycache__/
+
+# Qdrant storage and temporary ingest files
+qdrant_storage/
+backend/.ingest_tmp/
+backend/app/rag/.ingest_tmp/

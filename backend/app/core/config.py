@@ -1,10 +1,16 @@
 from functools import lru_cache
 from typing import List
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 
 
 class Settings(BaseSettings):
+    # Pydantic v2 settings config
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore",  # Ignore unknown env vars instead of raising
+    )
     app_name: str = "EVIDEV Chatbot API"
     app_version: str = "1.0.0"
     debug: bool = False
@@ -57,9 +63,7 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in self.allowed_origins.split(",")]
         return ["http://192.168.0.87:3000", "http://localhost:8080"]
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    # (Removed legacy inner Config to avoid conflict with model_config in Pydantic v2)
 
 
 @lru_cache()

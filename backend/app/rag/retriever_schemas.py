@@ -24,15 +24,9 @@ class DocumentChunk(BaseModel):
     doc_url: str
     
 class QueryResponse(BaseModel):
-    """Response model for retrieval queries"""
+    """Response model for retrieval queries (minimal)"""
     answer: str
-    used_chunks: List[DocumentChunk]
     query: str
-    user_id: str
-    user_role: str
-    audit_id: str
-    processing_time_ms: int
-    total_chunks_found: int
 
 class AuditLog(BaseModel):
     """Audit log entry for queries"""
