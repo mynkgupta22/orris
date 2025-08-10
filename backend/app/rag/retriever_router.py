@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse
 from typing import Dict
 import logging
 import time
 from datetime import datetime, timezone
+import os
+from pathlib import Path
 
 from app.core.dependencies import get_current_active_user
 from app.core.database import get_sync_db
@@ -297,3 +300,76 @@ async def delete_chat_session(
         raise HTTPException(status_code=404, detail="Chat session not found")
     
     return {"message": "Chat session deleted successfully"}
+
+@router.get("/images/{chunk_id}")
+async def get_chunk_image(
+    chunk_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Serve image files for RAG chunks
+    
+    Returns the image file associated with a specific chunk ID.
+    Access control is handled by the RAG pipeline - only chunks
+    the user has access to will be returned in queries.
+    """
+    try:
+        # Query Qdrant to get chunk metadata and verify access
+        from app.rag.index_qdrant import get_client
+        
+        client = get_client()
+        
+        # Retrieve the specific chunk by ID
+        points = client.retrieve(
+            collection_name="document_chunks",
+            ids=[chunk_id]
+        )
+        
+        if not points:
+            raise HTTPException(status_code=404, detail="Chunk not found")
+        
+        chunk = points[0]
+        payload = chunk.payload
+        
+        # Check if it's an image chunk
+        if not payload.get("is_image", False):
+            raise HTTPException(status_code=400, detail="Chunk is not an image")
+        
+        # Get image path from metadata
+        image_url = payload.get("image_url")
+        if not image_url:
+            raise HTTPException(status_code=404, detail="Image file not found in metadata")
+        
+        # Convert to absolute path and verify file exists
+        image_path = Path(image_url)
+        if not image_path.is_absolute():
+            # If relative path, make it relative to backend directory
+            image_path = Path(__file__).parent.parent.parent / image_path
+        
+        if not image_path.exists():
+            raise HTTPException(status_code=404, detail="Image file not found on disk")
+        
+        # Determine media type from file extension
+        media_type = "image/jpeg"  # default
+        ext = image_path.suffix.lower()
+        if ext in [".png"]:
+            media_type = "image/png"
+        elif ext in [".gif"]:
+            media_type = "image/gif"
+        elif ext in [".webp"]:
+            media_type = "image/webp"
+        
+        return FileResponse(
+            path=str(image_path),
+            media_type=media_type,
+            filename=f"{chunk_id}{image_path.suffix}"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to serve image for chunk {chunk_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve image"
+        )

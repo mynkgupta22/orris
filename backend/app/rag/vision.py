@@ -1,65 +1,86 @@
 from __future__ import annotations
 
 """
-Minimal image/graph summarization via LLaVA 1.6 7B.
+Minimal image/graph summarization via OpenAI GPT-4o-mini.
 
 This module exposes a single function `summarize_image_llava(image_path: str) -> str`
-that returns a short textual summary. It loads the model lazily on first call.
+that returns a short textual summary using OpenAI's vision API.
 
 Notes:
-- Requires a compatible environment (GPU recommended). If unavailable,
-  this function will raise at import/model load time.
+- Requires OPENAI_API_KEY environment variable to be set
 - For strict MVP, callers should handle exceptions and fall back gracefully.
 """
 
+import os
+import base64
 from typing import Optional
-import torch
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 try:
-    from transformers import AutoProcessor, AutoModelForVision2Seq
-except Exception as _e:  # pragma: no cover
-    AutoProcessor = None  # type: ignore
-    AutoModelForVision2Seq = None  # type: ignore
+    from openai import OpenAI
+except ImportError as _e:
+    OpenAI = None  # type: ignore
 
-_MODEL_ID = "llava-hf/llava-1.6-7b-hf"
-_processor: Optional[AutoProcessor] = None
-_model: Optional[AutoModelForVision2Seq] = None
+_client: Optional[OpenAI] = None
 
 
-def _load_model_if_needed():
-    global _processor, _model
-    if _processor is not None and _model is not None:
-        return
-    if AutoProcessor is None or AutoModelForVision2Seq is None:
-        raise RuntimeError(
-            "transformers is not available; please install it to use LLaVA summarization."
-        )
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    _processor = AutoProcessor.from_pretrained(_MODEL_ID)
-    _model = AutoModelForVision2Seq.from_pretrained(
-        _MODEL_ID,
-        torch_dtype=torch.float16 if device == "cuda" else None,
-        low_cpu_mem_usage=True,
-    ).to(device)
+def _get_client():
+    global _client
+    if _client is not None:
+        return _client
+    
+    if OpenAI is None:
+        raise RuntimeError("openai library is not available; please install it.")
+    
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY environment variable is required.")
+    
+    _client = OpenAI(api_key=api_key)
+    return _client
+
+
+def _encode_image(image_path: str) -> str:
+    """Encode image to base64 string"""
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
 
 
 def summarize_image_llava(image_path: str) -> str:
-    """Return a concise description/summary for graphs or images using LLaVA 1.6 7B.
+    """Return a concise description/summary for graphs or images using GPT-4o-mini.
 
     Keep the output short and informative for indexing.
     """
-    _load_model_if_needed()
-    assert _processor is not None and _model is not None
-
-    device = next(_model.parameters()).device
-    prompt = (
-        "You are an analyst. Briefly summarize the key trend(s), axes, and notable points in this chart."
-        " Keep it under 2 sentences."
+    client = _get_client()
+    
+    # Encode image to base64
+    base64_image = _encode_image(image_path)
+    
+    response = client.chat.completions.create(
+        model="gpt-4o-mini-2024-07-18",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "You are an analyst. Examine the chart or image and, in no more than 4 sentences, concisely describe the key trends, axes (including units, scales, and categories), and all notable features (if any), including subtle or distinct details that may be easily overlooked. Focus on insights and patterns rather than restating obvious labels, and ensure every sentence adds unique, non-redundant information."
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_image}"
+                        }
+                    }
+                ]
+            }
+        ],
+        max_tokens=150
     )
-    inputs = _processor(images=image_path, text=prompt, return_tensors="pt").to(device)
-    with torch.no_grad():
-        output_ids = _model.generate(**inputs, max_new_tokens=80)
-    summary = _processor.batch_decode(output_ids, skip_special_tokens=True)[0]
-    return summary.strip()
+    
+    return response.choices[0].message.content.strip() if response.choices[0].message.content else ""
 
 

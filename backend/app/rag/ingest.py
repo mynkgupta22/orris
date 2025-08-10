@@ -5,6 +5,13 @@ import mimetypes
 from datetime import datetime, UTC
 from pathlib import Path
 from typing import Dict, Any, List
+import sys
+from pathlib import Path
+
+# Add the backend directory to Python path so imports work when running directly
+backend_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(backend_root))
+
 from app.rag.schemas import DocumentChunk, ChunkMeta
 from app.rag.loaders import load_file_to_elements
 from app.rag.chunking import chunk_elements
@@ -15,7 +22,9 @@ from app.rag.sync_tracker import track_document_sync, mark_document_synced, mark
 
 try:
     from app.rag.vision import summarize_image_llava
-except Exception:
+    print("[INFO] Successfully imported LLaVA vision module")
+except Exception as e:
+    print(f"[WARN] Failed to import LLaVA vision module: {e}")
     summarize_image_llava = None  # type: ignore
 
 
@@ -61,10 +70,11 @@ def main() -> None:
     # Source selection via environment variables
     gdrive_root_id = os.getenv("GDRIVE_ROOT_ID")
     local_path = os.getenv("INGEST_LOCAL_PATH")
-    use_vision = os.getenv("USE_VISION", "false").lower() in {"1", "true", "yes"}
+    use_vision = os.getenv("USE_VISION", "true").lower() in {"1", "true", "yes"}  # Force enable for testing
     tmp_dir = os.getenv("INGEST_TMP_DIR", ".ingest_tmp")
 
     summarize_fn = summarize_image_llava if (use_vision and summarize_image_llava is not None) else None
+    print(f"[DEBUG] Vision enabled: {use_vision}, summarize_fn available: {summarize_fn is not None}")
 
     num_files = 0
     total_elements = 0
