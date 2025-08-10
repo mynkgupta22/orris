@@ -1,6 +1,7 @@
 import logging
 import time
 from typing import List, Dict, Optional
+from uuid import UUID
 from datetime import datetime
 
 from qdrant_client import QdrantClient
@@ -63,6 +64,7 @@ class RetrievalPipeline:
         self,
         query: str,
         user: User,
+        session_id: Optional[UUID] = None,
         top_k_pre: int = 30,
         top_k_post: int = 7,
         ip_address: Optional[str] = None,
@@ -169,6 +171,7 @@ class RetrievalPipeline:
             return QueryResponse(
                 answer=answer,
                 query=sanitized_query,
+                session_id=session_id,
             )
 
         except Exception as e:
@@ -178,6 +181,7 @@ class RetrievalPipeline:
                     "I encountered an error while processing your query. Please try again later."
                 ),
                 query=query,
+                session_id=session_id,
             )
 
     def get_service_status(self) -> Dict:

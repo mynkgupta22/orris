@@ -5,9 +5,15 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 
 from app.core.config import settings
 
+# Create synchronous engine for migrations and testing
+engine = create_engine(
+    settings.database_url,
+    echo=settings.debug
+)
 
+# Create synchronous session maker for testing
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-print()
 # Create async engine
 async_engine = create_async_engine(
     settings.database_url.replace("postgresql://", "postgresql+asyncpg://"),
@@ -33,3 +39,11 @@ async def get_db():
             yield session
         finally:
             await session.close()
+
+def get_sync_db():
+    """Get synchronous database session dependency"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

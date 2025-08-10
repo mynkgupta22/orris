@@ -53,10 +53,10 @@ class Settings(BaseSettings):
     temp_dir: str = "/tmp"
     
     # CORS
-    allowed_origins: str = "http://192.168.0.87:3000,http://localhost:8080"
+    allowed_origins: str = "http://192.168.0.87:3000,http://localhost:8080,http://192.168.0.93:8001,http://localhost:8001"
     
     # Rate Limiting
-    rate_limit_per_minute: int = 60
+    rate_limit_per_minute: int = 60 
     
     def get_allowed_origins(self) -> List[str]:
         if self.allowed_origins:

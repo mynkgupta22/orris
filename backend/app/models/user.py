@@ -35,6 +35,7 @@ class User(Base):
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     user_logs = relationship("UserLog", back_populates="user", cascade="all, delete-orphan")
     chatbot_audits = relationship("ChatbotAudit", back_populates="user", cascade="all, delete-orphan")
+    chat_histories = relationship("ChatHistory", back_populates="user", cascade="all, delete-orphan")
 
     def has_pi_access(self) -> bool:
         """Check if user has PI (Personal Information) access"""
