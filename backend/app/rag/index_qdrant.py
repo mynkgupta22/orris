@@ -13,9 +13,9 @@ from qdrant_client.models import (
     MatchValue,
 )
 
-from config import load_qdrant_config
-from schemas import DocumentChunk
-from embed import EmbeddingClient, get_embedding_client
+from app.rag.config import load_qdrant_config
+from app.rag.schemas import DocumentChunk
+from app.rag.embed import EmbeddingClient, get_embedding_client
 
 
 def get_client() -> QdrantClient:
@@ -119,6 +119,44 @@ def build_filter(eq: Optional[Dict[str, Any]] = None) -> Optional[Filter]:
     for key, value in eq.items():
         conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
     return Filter(must=conditions)
+
+
+def delete_document_chunks(source_doc_id: str) -> int:
+    """Delete all chunks belonging to a specific document from Qdrant.
+    
+    Args:
+        source_doc_id: The Google Drive file ID or document identifier
+        
+    Returns:
+        Number of chunks deleted
+    """
+    client = get_client()
+    collection = load_qdrant_config().collection_name
+    
+    # Build filter for the specific document
+    doc_filter = build_filter({"source_doc_id": source_doc_id})
+    
+    # First, get all points for this document to count them
+    search_result = client.scroll(
+        collection_name=collection,
+        scroll_filter=doc_filter,
+        limit=10000,  # Large limit to get all chunks for the document
+        with_payload=False,
+        with_vectors=False
+    )
+    
+    points_to_delete = [point.id for point in search_result[0]]
+    
+    if not points_to_delete:
+        return 0
+    
+    # Delete points by IDs
+    client.delete(
+        collection_name=collection,
+        points_selector=points_to_delete
+    )
+    
+    return len(points_to_delete)
 
 
 def search_text(

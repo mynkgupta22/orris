@@ -14,7 +14,7 @@ try:
 except Exception:  # fallback for older installations
     from langchain.text_splitter import RecursiveCharacterTextSplitter  # type: ignore
 
-from schemas import DocumentChunk, ChunkMeta
+from app.rag.schemas import DocumentChunk, ChunkMeta
 
 
 def _estimate_token_count(text: str) -> int:

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.routers import auth, users
+from app.routers import auth, users, webhooks
 from app.rag.retriever_router import router as rag_router
 
 app = FastAPI(
@@ -22,6 +22,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
 app.include_router(users.router, prefix="/users", tags=["users"])
+app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 app.include_router(rag_router)
 
 @app.get("/", tags=["root"])

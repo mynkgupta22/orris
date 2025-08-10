@@ -5,15 +5,16 @@ import mimetypes
 from datetime import datetime, UTC
 from pathlib import Path
 from typing import Dict, Any, List
-from schemas import DocumentChunk, ChunkMeta
-from loaders import load_file_to_elements
-from chunking import chunk_elements
-from index_qdrant import upsert_document_chunks
-from drive import get_drive_service, walk_from_root, download_file, resolve_type_from_mime, classify_from_path
-from extractors import extract_pdf_images, extract_docx_images
+from app.rag.schemas import DocumentChunk, ChunkMeta
+from app.rag.loaders import load_file_to_elements
+from app.rag.chunking import chunk_elements
+from app.rag.index_qdrant import upsert_document_chunks
+from app.rag.drive import get_drive_service, walk_from_root, download_file, resolve_type_from_mime, classify_from_path
+from app.rag.extractors import extract_pdf_images, extract_docx_images
+from app.rag.sync_tracker import track_document_sync, mark_document_synced, mark_document_failed, document_needs_resync
 
 try:
-    from vision import summarize_image_llava
+    from app.rag.vision import summarize_image_llava
 except Exception:
     summarize_image_llava = None  # type: ignore
 
@@ -69,6 +70,7 @@ def main() -> None:
     total_elements = 0
     total_chunks = 0
     all_chunks: List[DocumentChunk] = []
+    processed_docs = set()  # Track successfully processed document IDs
 
     if gdrive_root_id:
         service = get_drive_service()
@@ -79,7 +81,17 @@ def main() -> None:
             dtype = resolve_type_from_mime(f.name, f.mime_type)
             if dtype is None:
                 continue
+            
+            # Check if document needs sync (new or modified)
+            if not document_needs_resync(f.id, f.modified_time):
+                print(f"[SKIP] {f.name} is already up to date")
+                continue
+            
             num_files += 1
+            
+            # Track document sync start
+            track_document_sync(f.id, f.name, f.modified_time)
+            
             # Classify PI/NON PI from logical path
             is_pi, uid, roles = classify_from_path(f.path_segments)
             # Download to temp path
@@ -89,6 +101,7 @@ def main() -> None:
                 download_file(service, f.id, dest)
             except Exception as e:
                 print(f"[WARN] Download failed {f.name}: {e}")
+                mark_document_failed(f.id, f"Download failed: {str(e)}")
                 continue
             base_meta = {
                 "source_doc_id": f.id,
@@ -126,13 +139,19 @@ def main() -> None:
 
             try:
                 elements = load_file_to_elements(str(dest), base_meta, summarize_image_fn=summarize_fn, image_lookup=image_lookup)
+                total_elements += len(elements)
+                chunks = chunk_elements(elements)
+                total_chunks += len(chunks)
+                all_chunks.extend(chunks)
+                processed_docs.add(f.id)  # Track successful processing
+                
+                # Mark document as successfully processed (will be marked synced after indexing)
+                print(f"[SUCCESS] Processed {f.name}: {len(elements)} elements, {len(chunks)} chunks")
+                
             except Exception as e:
-                print(f"[WARN] Skipping {f.name}: {e}")
+                print(f"[WARN] Processing failed for {f.name}: {e}")
+                mark_document_failed(f.id, f"Processing failed: {str(e)}")
                 continue
-            total_elements += len(elements)
-            chunks = chunk_elements(elements)
-            total_chunks += len(chunks)
-            all_chunks.extend(chunks)
     elif local_path:
         root = Path(local_path)
         assert root.exists() and root.is_dir(), f"Path does not exist or not a directory: {root}"
@@ -177,9 +196,15 @@ def main() -> None:
         return
 
     written = upsert_document_chunks(all_chunks)
+    
+    # Mark successfully indexed documents as synced
+    synced_count = 0
+    for doc_id in processed_docs:
+        if mark_document_synced(doc_id):
+            synced_count += 1
 
     print(
-        f"Ingestion complete: files={num_files}, elements={total_elements}, chunks={total_chunks}, indexed={written}"
+        f"Ingestion complete: files={num_files}, elements={total_elements}, chunks={total_chunks}, indexed={written}, synced={synced_count}"
     )
 
 

@@ -1,0 +1,72 @@
+[
+  {
+    "channel_id": "orris-sync-1NmJmAGWP4TMIzw4Algfl5OkiWgYdsfgh",
+    "resource_id": "pLUf8pPQdwQt6gMT-oKz0r57bg4",
+    "folder_id": "1NmJmAGWP4TMIzw4Algfl5OkiWgYdsfgh",
+    "webhook_url": "https://db45c8de6fab.ngrok-free.app/webhooks/google-drive",
+    "description": "Main RAG Folder",
+    "created_at": "2025-08-10T19:27:28.350358",
+    "expiration": "1754837848000",
+    "status": "active"
+  },
+  {
+    "channel_id": "orris-sync-1NmJmAGWP4TMIzw4Algfl5OkiWgYdsfgh-6ca94a42",
+    "resource_id": "pLUf8pPQdwQt6gMT-oKz0r57bg4",
+    "folder_id": "1NmJmAGWP4TMIzw4Algfl5OkiWgYdsfgh",
+    "webhook_url": "https://db45c8de6fab.ngrok-free.app/webhooks/google-drive",
+    "description": "Main RAG Folder",
+    "created_at": "2025-08-10T19:40:17.747201",
+    "expiration": "1754838617000",
+    "status": "active"
+  },
+  {
+    "channel_id": "orris-sync-1NaJHy1DpoN-i4zpPzNfl1yeGWKuOxhfN-b5ab77ac",
+    "resource_id": "xd3e3unsCFwESBCWfNIBm1mkhGk",
+    "folder_id": "1NaJHy1DpoN-i4zpPzNfl1yeGWKuOxhfN",
+    "webhook_url": "https://db45c8de6fab.ngrok-free.app/webhooks/google-drive",
+    "description": "Subfolder: PI",
+    "created_at": "2025-08-10T19:57:17.935904",
+    "expiration": "1754839637000",
+    "status": "active"
+  },
+  {
+    "channel_id": "orris-sync-1ybSOgUKJlMkrDU1CxoOS0ER8amBtEg5B-41f23368",
+    "resource_id": "6MuC4C_ObCN5Vsu7_nz705adQv0",
+    "folder_id": "1ybSOgUKJlMkrDU1CxoOS0ER8amBtEg5B",
+    "webhook_url": "https://db45c8de6fab.ngrok-free.app/webhooks/google-drive",
+    "description": "Subfolder: PI/4",
+    "created_at": "2025-08-10T19:57:19.795835",
+    "expiration": "1754839639000",
+    "status": "active"
+  },
+  {
+    "channel_id": "orris-sync-10ECPTmi04z6e7ft9BrHf-z7ddJvmipl2-093f4713",
+    "resource_id": "ju41pIbcO_Zc4Ia1352ocBbyxLs",
+    "folder_id": "10ECPTmi04z6e7ft9BrHf-z7ddJvmipl2",
+    "webhook_url": "https://db45c8de6fab.ngrok-free.app/webhooks/google-drive",
+    "description": "Subfolder: PI/1",
+    "created_at": "2025-08-10T19:57:21.092441",
+    "expiration": "1754839640000",
+    "status": "active"
+  },
+  {
+    "channel_id": "orris-sync-1dhHERNcFhlBBSRYbhZnLICqx9HhFVV4n-d00ece6b",
+    "resource_id": "dJJu_fLSv-M2qZoUACGzL4d4NCE",
+    "folder_id": "1dhHERNcFhlBBSRYbhZnLICqx9HhFVV4n",
+    "webhook_url": "https://db45c8de6fab.ngrok-free.app/webhooks/google-drive",
+    "description": "Subfolder: NonPI",
+    "created_at": "2025-08-10T19:57:22.309165",
+    "expiration": "1754839642000",
+    "status": "active"
+  },
+  {
+    "channel_id": "orris-sync-1NmJmAGWP4TMIzw4Algfl5OkiWgYdsfgh-81546fb0",
+    "resource_id": "pLUf8pPQdwQt6gMT-oKz0r57bg4",
+    "folder_id": "1NmJmAGWP4TMIzw4Algfl5OkiWgYdsfgh",
+    "webhook_url": "https://db45c8de6fab.ngrok-free.app/webhooks/google-drive",
+    "description": "Main RAG Folder",
+    "created_at": "2025-08-10T21:23:27.425117",
+    "expiration": "1754844807000",
+    "status": "active"
+  }
+]

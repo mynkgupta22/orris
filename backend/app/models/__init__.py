@@ -4,5 +4,6 @@ from app.models.user_log import UserLog
 from app.models.chatbot_audit import ChatbotAudit
 from app.models.chat_history import ChatHistory
 from app.models.query_log import QueryLog
+from app.models.document_sync import DocumentSync
 
-__all__ = ["User", "RefreshToken", "UserLog", "ChatbotAudit", "ChatHistory", "QueryLog"]
+__all__ = ["User", "RefreshToken", "UserLog", "ChatbotAudit", "ChatHistory", "QueryLog", "DocumentSync"]

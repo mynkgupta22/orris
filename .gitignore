@@ -80,6 +80,7 @@ Thumbs.db
 
 # Alembic
 alembic/versions/__pycache__/
+backend/alembic/versions/2025_08_10_1759-edd6fcefb3d1_add_document_sync_tracking_table.py
 
 # Qdrant storage and temporary ingest files
 qdrant_storage/

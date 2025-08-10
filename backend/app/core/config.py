@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     chunk_overlap: str = "50"
     temp_dir: str = "/tmp"
     
+    # Webhook Configuration
+    webhook_base_url: str = ""
+    google_webhook_token: str = ""
+    gdrive_root_id: str = ""
+    
     # CORS
     allowed_origins: str = "http://192.168.0.87:3000,http://localhost:8080,http://192.168.0.93:8001,http://localhost:8001"
     
