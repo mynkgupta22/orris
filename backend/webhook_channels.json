@@ -68,5 +68,15 @@
     "created_at": "2025-08-10T21:23:27.425117",
     "expiration": "1754844807000",
     "status": "active"
+  },
+  {
+    "channel_id": "orris-sync-1NmJmAGWP4TMIzw4Algfl5OkiWgYdsfgh-2741d45e",
+    "resource_id": "pLUf8pPQdwQt6gMT-oKz0r57bg4",
+    "folder_id": "1NmJmAGWP4TMIzw4Algfl5OkiWgYdsfgh",
+    "webhook_url": "https://db45c8de6fab.ngrok-free.app/webhooks/google-drive",
+    "description": "Main RAG Folder",
+    "created_at": "2025-08-11T04:22:04.881262",
+    "expiration": "1754869924000",
+    "status": "active"
   }
 ]

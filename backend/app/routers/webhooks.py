@@ -106,7 +106,8 @@ async def google_drive_webhook(
                 channel_id=x_goog_channel_id,
                 resource_state=x_goog_resource_state,
                 resource_id=x_goog_resource_id,
-                message_number=x_goog_message_number
+                message_number=x_goog_message_number,
+                changed=x_goog_changed
             )
             
             logger.info(f"Queued background task for {x_goog_resource_state} notification")

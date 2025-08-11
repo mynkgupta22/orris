@@ -50,6 +50,8 @@ class DocumentSync(Base):
         """Check if document needs to be re-synced based on modification time"""
         if self.sync_status == SyncStatus.DELETED:
             return False
-        if self.last_synced_at is None:
+        if self.last_synced_at is None or self.sync_status != SyncStatus.SYNCED:
             return True
+        # Compare drive modification time with our stored modification time
+        # If Google Drive's version is newer than what we have, we need to sync
         return drive_modified_time > self.last_modified_at

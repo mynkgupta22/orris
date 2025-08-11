@@ -7,13 +7,101 @@ import asyncio
 from googleapiclient.errors import HttpError
 
 from app.rag.drive import get_drive_service
-from app.rag.sync_tracker import track_document_sync, mark_document_synced, mark_document_failed
+from app.rag.sync_tracker import track_document_sync, mark_document_synced, mark_document_failed, document_needs_resync
 from app.rag.index_qdrant import delete_document_chunks, upsert_document_chunks
 from app.rag.loaders import load_file_to_elements
 from app.rag.chunking import chunk_elements
 from app.rag.drive import resolve_type_from_mime, classify_from_path, download_file
+import json
 
 logger = logging.getLogger(__name__)
+
+
+def _get_folder_id_from_channel(channel_id: Optional[str]) -> Optional[str]:
+    """
+    Look up the folder ID from channel ID using webhook_channels.json
+    """
+    if not channel_id:
+        return None
+        
+    try:
+        channels_file = Path("webhook_channels.json")
+        if not channels_file.exists():
+            logger.warning("webhook_channels.json file not found")
+            return None
+            
+        with open(channels_file, 'r') as f:
+            channels = json.load(f)
+            
+        for channel in channels:
+            if channel.get('channel_id') == channel_id and channel.get('status') == 'active':
+                return channel.get('folder_id')
+                
+        # If exact match not found, try to find a channel with similar base ID
+        # Extract base channel ID (remove the suffix after last dash)
+        if '-' in channel_id:
+            base_channel_id = '-'.join(channel_id.split('-')[:-1])
+            for channel in channels:
+                if channel.get('channel_id', '').startswith(base_channel_id) and channel.get('status') == 'active':
+                    logger.info(f"Found folder ID via base channel match: {base_channel_id}")
+                    return channel.get('folder_id')
+        
+        # Final fallback: if channel ID follows our naming pattern, extract folder ID
+        if channel_id and channel_id.startswith('orris-sync-'):
+            # Extract folder ID from channel naming pattern: orris-sync-{folder_id}-{suffix}
+            parts = channel_id.split('-')
+            if len(parts) >= 3:
+                potential_folder_id = '-'.join(parts[2:-1])  # Remove 'orris', 'sync', and last suffix
+                if potential_folder_id:
+                    logger.info(f"Extracted potential folder ID from channel name: {potential_folder_id}")
+                    return potential_folder_id
+                
+        logger.warning(f"No active folder found for channel {channel_id}")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error looking up folder ID for channel {channel_id}: {e}")
+        return None
+
+
+async def _resolve_folder_path(service, parents: list) -> list[str]:
+    """
+    Resolve folder path from parent IDs to get proper classification
+    """
+    if not parents:
+        return []
+        
+    try:
+        # For webhook processing, we typically only have one parent
+        parent_id = parents[0]
+        path_segments = []
+        
+        # Traverse up the folder hierarchy to build the path
+        current_id = parent_id
+        while current_id:
+            try:
+                folder_metadata = service.files().get(
+                    fileId=current_id,
+                    fields='id,name,parents'
+                ).execute()
+                
+                folder_name = folder_metadata.get('name')
+                if folder_name:
+                    path_segments.insert(0, folder_name)
+                    
+                # Move to next parent
+                folder_parents = folder_metadata.get('parents', [])
+                current_id = folder_parents[0] if folder_parents else None
+                
+            except Exception as e:
+                logger.warning(f"Could not resolve folder {current_id}: {e}")
+                break
+                
+        return path_segments
+        
+    except Exception as e:
+        logger.error(f"Error resolving folder path: {e}")
+        return []
 
 
 async def _get_file_metadata_with_retry(service, file_id: str, max_retries: int = 6):
@@ -69,7 +157,8 @@ async def process_drive_change_notification(
     channel_id: Optional[str],
     resource_state: str,
     resource_id: Optional[str],
-    message_number: Optional[str]
+    message_number: Optional[str],
+    changed: Optional[str] = None
 ):
     """
     Process Google Drive change notifications in background.
@@ -80,10 +169,21 @@ async def process_drive_change_notification(
         resource_id: Google Drive resource ID
         message_number: Sequence number for this notification
     """
-    logger.info(f"Processing Drive change: {resource_state} for resource {resource_id}")
+    logger.info(f"Processing Drive change: {resource_state} for resource {resource_id}, changed={changed}")
     
     try:
-        if resource_state in ["remove", "trash"]:
+        # Handle folder change notifications (when files are added/removed from folders)
+        if changed == "children" and resource_state in ["update", "add"]:
+            logger.info(f"Detected folder children change for channel {channel_id}")
+            # Look up the actual folder ID from channel ID
+            folder_id = _get_folder_id_from_channel(channel_id)
+            if folder_id:
+                logger.info(f"Found folder ID {folder_id} for channel {channel_id}, scanning for changes")
+                service = get_drive_service()
+                await _scan_folder_for_changes(service, folder_id)
+            else:
+                logger.warning(f"Could not find folder ID for channel {channel_id}")
+        elif resource_state in ["remove", "trash"]:
             await _handle_document_deletion(resource_id)
         elif resource_state in ["update", "add"]:
             await _handle_document_upsert(resource_id)
@@ -179,11 +279,13 @@ async def _handle_document_upsert(file_id: Optional[str]):
             file_metadata['modifiedTime'].replace('Z', '+00:00')
         )
         
-        # Always process webhook notifications (they indicate changes)
-        track_document_sync(file_id, file_metadata['name'], modified_time)
-        
-        # Process the document
-        await _process_single_document(service, file_metadata)
+        # Check if document actually needs re-syncing based on modification time
+        if document_needs_resync(file_id, modified_time):
+            logger.info(f"Document {file_metadata['name']} needs syncing - processing")
+            track_document_sync(file_id, file_metadata['name'], modified_time)
+            await _process_single_document(service, file_metadata)
+        else:
+            logger.info(f"Document {file_metadata['name']} is already up-to-date, skipping sync")
         
     except Exception as e:
         logger.error(f"Error handling document upsert for {file_id}: {e}")
@@ -226,9 +328,9 @@ async def _process_single_document(service, file_metadata):
         
         # Determine document classification (PI/Non-PI) from parents
         parents = file_metadata.get('parents', [])
-        # For webhook processing, we need to traverse up to determine the classification
-        # This is simplified - you may need to implement folder path resolution
-        is_pi, uid, roles = False, None, ["non_pi"]  # Default classification
+        # Resolve folder path to determine classification
+        folder_path = await _resolve_folder_path(service, parents)
+        is_pi, uid, roles = classify_from_path(folder_path)
         
         # Build metadata
         base_meta = {
@@ -241,7 +343,7 @@ async def _process_single_document(service, file_metadata):
             "uid": uid,
             "roles_allowed": roles,
             "is_pi": is_pi,
-            "folder_path": "",  # Would need to resolve from parents
+            "folder_path": "/".join(folder_path),
             "source_last_modified_at": datetime.fromisoformat(
                 file_metadata['modifiedTime'].replace('Z', '+00:00')
             ),
@@ -285,11 +387,11 @@ async def _scan_folder_for_changes(service, folder_id: str):
     try:
         from datetime import datetime, UTC, timedelta
         
-        # Look for files modified in the last 10 minutes (increased window for webhook delays)
-        cutoff_time = datetime.now(UTC) - timedelta(minutes=10)
+        # Look for files modified in the last 30 minutes (increased window for webhook delays)
+        cutoff_time = datetime.now(UTC) - timedelta(minutes=30)
         cutoff_str = cutoff_time.isoformat().replace('+00:00', 'Z')
         
-        logger.info(f"Scanning folder {folder_id} for files modified after {cutoff_str}")
+        logger.info(f"Scanning folder {folder_id} for files created or modified after {cutoff_str}")
         
         # First, verify this is actually a folder by trying to get its metadata
         try:
@@ -302,18 +404,31 @@ async def _scan_folder_for_changes(service, folder_id: str):
             logger.error(f"Could not access folder {folder_id}: {e}")
             raise
         
-        # Query for recently modified files in this folder and subfolders
-        query = f"'{folder_id}' in parents and modifiedTime > '{cutoff_str}' and trashed = false"
+        # Query for recently modified OR created files in this folder and subfolders
+        # When files are uploaded, they might be "created" rather than "modified"
+        query = f"'{folder_id}' in parents and (modifiedTime > '{cutoff_str}' or createdTime > '{cutoff_str}') and trashed = false"
         
         results = service.files().list(
             q=query,
-            fields='files(id,name,mimeType,modifiedTime,parents,webViewLink,trashed)',
+            fields='files(id,name,mimeType,modifiedTime,createdTime,parents,webViewLink,trashed)',
             orderBy='modifiedTime desc',
             pageSize=50
         ).execute()
         
         files = results.get('files', [])
         logger.info(f"Found {len(files)} recently modified files in folder")
+        
+        # Debug: Also show all files (not just recently modified) to understand what's in the folder
+        debug_results = service.files().list(
+            q=f"'{folder_id}' in parents and trashed = false",
+            fields='files(id,name,mimeType,modifiedTime,createdTime)',
+            orderBy='modifiedTime desc',
+            pageSize=10
+        ).execute()
+        debug_files = debug_results.get('files', [])
+        logger.info(f"Debug: Total files in folder {folder_id}: {len(debug_files)}")
+        for file in debug_files[:3]:  # Show first 3 files
+            logger.info(f"Debug: File '{file.get('name')}' created at {file.get('createdTime')}, modified at {file.get('modifiedTime')}")
         
         # Process each file
         for file_metadata in files:
@@ -332,9 +447,13 @@ async def _scan_folder_for_changes(service, folder_id: str):
                 file_metadata['modifiedTime'].replace('Z', '+00:00')
             )
             
-            # Track and process the document
-            track_document_sync(file_id, file_name, modified_time)
-            await _process_single_document(service, file_metadata)
+            # Check if document actually needs re-syncing
+            if document_needs_resync(file_id, modified_time):
+                logger.info(f"Document {file_name} from folder scan needs syncing - processing")
+                track_document_sync(file_id, file_name, modified_time)
+                await _process_single_document(service, file_metadata)
+            else:
+                logger.info(f"Document {file_name} from folder scan is already up-to-date, skipping")
         
         # Also scan subfolders recursively
         subfolder_query = f"'{folder_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
