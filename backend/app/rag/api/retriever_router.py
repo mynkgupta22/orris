@@ -12,8 +12,8 @@ from app.core.database import get_sync_db
 from app.models.user import User, UserRole
 from app.services.chat_service import ChatService
 from sqlalchemy.orm import Session
-from app.rag.retrieval_pipeline import RetrievalPipeline
-from app.rag.retriever_schemas import QueryRequest, QueryResponse
+from app.rag.pipeline.retrieval_pipeline import RetrievalPipeline
+from app.rag.api.retriever_schemas import QueryRequest, QueryResponse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

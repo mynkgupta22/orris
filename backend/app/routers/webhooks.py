@@ -169,7 +169,8 @@ def _is_known_channel(channel_id: str) -> bool:
         from pathlib import Path
         import json
         
-        channels_file = Path("webhook_channels.json")
+        from app.core.paths import WEBHOOK_CHANNELS_PATH
+        channels_file = WEBHOOK_CHANNELS_PATH
         if channels_file.exists():
             with open(channels_file, 'r') as f:
                 channels = json.load(f)

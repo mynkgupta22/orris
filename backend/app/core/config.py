@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import List
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 
@@ -7,7 +8,7 @@ from pydantic import field_validator
 class Settings(BaseSettings):
     # Pydantic v2 settings config
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(Path(__file__).parent.parent.parent / "config" / ".env"),
         case_sensitive=False,
         extra="ignore",  # Ignore unknown env vars instead of raising
     )

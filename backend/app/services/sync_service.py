@@ -6,9 +6,9 @@ from pathlib import Path
 import asyncio
 from googleapiclient.errors import HttpError
 
-from app.rag.drive import get_drive_service
-from app.rag.sync_tracker import track_document_sync, mark_document_synced, mark_document_failed, document_needs_resync
-from app.rag.index_qdrant import delete_document_chunks, upsert_document_chunks
+from app.rag.integrations.drive import get_drive_service
+from app.rag.storage.sync_tracker import track_document_sync, mark_document_synced, mark_document_failed, document_needs_resync
+from app.rag.storage.index_qdrant import delete_document_chunks, upsert_document_chunks
 from app.rag.loaders import load_file_to_elements
 from app.rag.chunking import chunk_elements
 from app.rag.drive import resolve_type_from_mime, classify_from_path, download_file
@@ -25,7 +25,8 @@ def _get_folder_id_from_channel(channel_id: Optional[str]) -> Optional[str]:
         return None
         
     try:
-        channels_file = Path("webhook_channels.json")
+        from app.core.paths import WEBHOOK_CHANNELS_PATH
+        channels_file = WEBHOOK_CHANNELS_PATH
         if not channels_file.exists():
             logger.warning("webhook_channels.json file not found")
             return None

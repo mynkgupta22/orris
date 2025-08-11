@@ -16,7 +16,7 @@ from typing import Optional, List
 # Add the backend directory to the Python path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from app.rag.drive import get_drive_service
+from app.rag.integrations.drive import get_drive_service
 from app.services.sync_service import setup_drive_webhook
 
 

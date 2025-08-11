@@ -165,6 +165,11 @@ def load_docx(path: str, base_meta: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def load_txt(path: str, base_meta: Dict[str, Any]) -> List[Dict[str, Any]]:
+    try:
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
+    except ImportError:
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
+
     p = Path(path)
     try:
         text = p.read_text(encoding="utf-8")
@@ -173,15 +178,33 @@ def load_txt(path: str, base_meta: Dict[str, Any]) -> List[Dict[str, Any]]:
 
     if not text.strip():
         return []
-    return [
-        _normalize_element(
-            text=text,
-            base_meta=base_meta,
-            is_table=False,
-            is_image=False,
-            source_page=None,
-        )
-    ]
+
+    # Initialize the text splitter with same parameters as PDF
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=2000,
+        chunk_overlap=200,
+        length_function=len,
+        separators=["\n\n", "\n", " ", ""]
+    )
+    
+    # Split the text into chunks
+    chunks = text_splitter.split_text(text)
+    
+    # Convert chunks to normalized elements
+    normalized = []
+    for i, chunk in enumerate(chunks):
+        if chunk.strip():
+            normalized.append(
+                _normalize_element(
+                    text=chunk,
+                    base_meta=base_meta,
+                    is_table=False,
+                    is_image=False,
+                    source_page=None,
+                )
+            )
+    
+    return normalized
 
 
 def load_xlsx(path: str, base_meta: Dict[str, Any]) -> List[Dict[str, Any]]:

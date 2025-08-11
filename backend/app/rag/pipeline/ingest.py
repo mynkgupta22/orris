@@ -12,16 +12,16 @@ from pathlib import Path
 backend_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_root))
 
-from app.rag.schemas import DocumentChunk, ChunkMeta
-from app.rag.loaders import load_file_to_elements
-from app.rag.chunking import chunk_elements
-from app.rag.index_qdrant import upsert_document_chunks
-from app.rag.drive import get_drive_service, walk_from_root, download_file, resolve_type_from_mime, classify_from_path
-from app.rag.extractors import extract_pdf_images, extract_docx_images
-from app.rag.sync_tracker import track_document_sync, mark_document_synced, mark_document_failed, document_needs_resync
+from app.rag.core.schemas import DocumentChunk, ChunkMeta
+from app.rag.core.loaders import load_file_to_elements
+from app.rag.core.chunking import chunk_elements
+from app.rag.storage.index_qdrant import upsert_document_chunks
+from app.rag.integrations.drive import get_drive_service, walk_from_root, download_file, resolve_type_from_mime, classify_from_path
+from app.rag.core.extractors import extract_pdf_images, extract_docx_images
+from app.rag.storage.sync_tracker import track_document_sync, mark_document_synced, mark_document_failed, document_needs_resync
 
 try:
-    from app.rag.vision import summarize_image_llava
+    from app.rag.integrations.vision import summarize_image_llava
     print("[INFO] Successfully imported LLaVA vision module")
 except Exception as e:
     print(f"[WARN] Failed to import LLaVA vision module: {e}")

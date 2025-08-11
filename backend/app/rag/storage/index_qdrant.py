@@ -13,7 +13,7 @@ from qdrant_client.models import (
     MatchValue,
 )
 
-from app.rag.config import load_qdrant_config
+from app.rag.config.config import load_qdrant_config
 from app.rag.schemas import DocumentChunk
 from app.rag.embed import EmbeddingClient, get_embedding_client
 

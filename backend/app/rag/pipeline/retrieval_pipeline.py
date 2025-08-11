@@ -12,9 +12,9 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from app.models.user import User
-from app.rag.config import Config
-from app.rag.access_control import AccessController
-from app.rag.retriever_schemas import DocumentChunk, QueryResponse, AuditLog
+from app.rag.config.config import Config
+from app.rag.pipeline.access_control import AccessController
+from app.rag.api.retriever_schemas import DocumentChunk, QueryResponse, AuditLog
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
