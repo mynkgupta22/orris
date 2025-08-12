@@ -6,14 +6,23 @@ from pathlib import Path
 import asyncio
 from googleapiclient.errors import HttpError
 
+# Initialize logger early
+logger = logging.getLogger(__name__)
+
 from app.rag.integrations.drive import get_drive_service, resolve_type_from_mime, classify_from_path, download_file
 from app.rag.storage.sync_tracker import track_document_sync, mark_document_synced, mark_document_failed, document_needs_resync
 from app.rag.storage.index_qdrant import delete_document_chunks, upsert_document_chunks
 from app.rag.core.loaders import load_file_to_elements
 from app.rag.core.chunking import chunk_elements
+from app.rag.core.extractors import extract_pdf_images, extract_docx_images
 import json
 
-logger = logging.getLogger(__name__)
+try:
+    from app.rag.integrations.vision import summarize_image_llava
+    logger.info("Successfully imported LLaVA vision module for webhook processing.")
+except Exception as e:
+    logger.warning(f"Could not import LLaVA vision module for webhook: {e}")
+    summarize_image_llava = None
 
 
 def _get_folder_id_from_channel(channel_id: Optional[str]) -> Optional[str]:
@@ -353,7 +362,31 @@ async def _process_single_document(service, file_metadata):
         
         # Process document
         try:
-            elements = load_file_to_elements(str(dest_path), base_meta)
+            # Enable vision summarization if available
+            use_vision = os.getenv("USE_VISION", "true").lower() in {"1", "true", "yes"}
+            summarize_fn = summarize_image_llava if (use_vision and summarize_image_llava is not None) else None
+            
+            # Optional: extract images for PDFs and DOCX
+            image_lookup = None
+            if dtype == "pdf":
+                extracted_dir = tmp_dir / "_images" / file_id
+                page_map = extract_pdf_images(str(dest_path), str(extracted_dir))
+                def _lookup(page_no: int):
+                    return page_map.get(page_no, [])
+                image_lookup = _lookup
+            elif dtype == "docx":
+                extracted_dir = tmp_dir / "_images" / file_id
+                img_paths = extract_docx_images(str(dest_path), str(extracted_dir))
+                def _lookup(_: int):
+                    return img_paths
+                image_lookup = _lookup
+
+            elements = load_file_to_elements(
+                str(dest_path), 
+                base_meta, 
+                summarize_image_fn=summarize_fn, 
+                image_lookup=image_lookup
+            )
             chunks = chunk_elements(elements)
             
             if chunks:
