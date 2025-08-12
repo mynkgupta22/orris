@@ -213,15 +213,7 @@ class EmbeddingClient:
             # L2 normalize each embedding
             norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
             norms = np.where(norms > 0, norms, 1)  # Avoid division by zero
-            embeddings = embeddings / norms
-
-            # --- Added for debugging ---
-            print("--- Batch Embeddings Generated ---")
-            print(f"Model: {self.model_name}")
-            print(f"Number of texts: {len(texts)}")
-            print(f"Embeddings (shape: {embeddings.shape}):\n{embeddings}")
-            print("-----------------------------------")
-            
+            embeddings = embeddings / norms           
             return embeddings
             
         except httpx.HTTPStatusError as e:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional, Callable
 from pathlib import Path
 import os
@@ -90,14 +91,20 @@ def load_pdf(
 
         if is_image:
             summary: Optional[str] = None
+            base64_image: Optional[str] = None
             if summarize_image_fn is not None:
                 try:
                     # Prefer extracted image if available for this page
                     img_paths = image_lookup(page_number) if (image_lookup and page_number) else []
                     target_img = img_paths[0] if img_paths else path
-                    summary = summarize_image_fn(target_img)
-                except Exception:
+                    summary, base64_image = summarize_image_fn(target_img)
+                    print("====================")
+                    print(f"PDF Image Base64: {base64_image[:100] if base64_image else 'None'}")
+                except Exception as e:
                     summary = None
+                    base64_image = None
+                    print("====================")
+                    logging.error(f"Failed to summarize image {target_img} in PDF {path}: {e}")
             if summary and summary.strip():
                 text = summary
             elif not text.strip():
@@ -117,6 +124,8 @@ def load_pdf(
         if is_image:
             meta_with_summary = dict(elem["meta"])  # shallow copy
             meta_with_summary["image_summary"] = text
+            if base64_image:
+                meta_with_summary["image_base64"] = base64_image
             # record the first extracted image path, if any
             if image_lookup and page_number:
                 img_paths = image_lookup(page_number)
@@ -232,11 +241,17 @@ def load_image(
     # Summarize via callback if provided; otherwise placeholder text
     name = base_meta.get("source_doc_name", Path(path).name)
     summary: Optional[str] = None
+    base64_image: Optional[str] = None
     if summarize_image_fn is not None:
         try:
-            summary = summarize_image_fn(path)
-        except Exception:
+            summary, base64_image = summarize_image_fn(path)
+            print("====================")
+            print(f"Standalone Image Base64: {base64_image[:100] if base64_image else 'None'}")
+        except Exception as e:
             summary = None
+            base64_image = None
+            print("====================")
+            logging.error(f"Failed to summarize image {path}: {e}")
     text = summary if (summary and summary.strip()) else f"Image: {name}"
     elem = _normalize_element(
         text=text,
@@ -248,6 +263,8 @@ def load_image(
     meta_with_summary = dict(elem["meta"])  # shallow copy
     meta_with_summary["image_summary"] = text
     meta_with_summary["image_url"] = str(Path(path))
+    if base64_image:
+        meta_with_summary["image_base64"] = base64_image
     elem["meta"] = meta_with_summary
     return [elem]
 
