@@ -7,6 +7,7 @@ cffi==1.17.1
 chardet==5.2.0
 click==8.2.1
 cryptography==45.0.6
+email-validator==2.1.1
 fastapi==0.116.1
 fitz==0.0.1.dev2
 grpcio_status==1.74.0
