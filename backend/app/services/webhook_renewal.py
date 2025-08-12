@@ -35,8 +35,7 @@ async def check_and_renew_webhooks():
                 try:
                     # Setup new webhook
                     new_channel_info = setup_drive_webhook(
-                        channel.get('webhook_url'),
-                        channel.get('folder_id')
+                        folder_id=channel.get('folder_id')
                     )
                     
                     # Update channel information
