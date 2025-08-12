@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Brain, Eye, EyeOff, Shield, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useAuthStore } from '@/lib/stores/auth'
@@ -26,23 +25,18 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    name: '',
     email: '',
-    company: '',
-    password: '',
-    agreeToTerms: false
+    password: ''
   })
 
   const validateForm = () => {
     const errors: Record<string, string> = {}
     
-    if (!formData.firstName.trim()) errors.firstName = 'First name is required'
-    if (!formData.lastName.trim()) errors.lastName = 'Last name is required'
+    if (!formData.name.trim()) errors.name = 'Name is required'
     if (!formData.email.trim()) errors.email = 'Email is required'
     if (!formData.password) errors.password = 'Password is required'
     if (formData.password !== confirmPassword) errors.confirmPassword = 'Passwords do not match'
-    if (!formData.agreeToTerms) errors.terms = 'You must agree to the terms'
     
     setFieldErrors(errors)
     return Object.keys(errors).length === 0
@@ -53,11 +47,12 @@ export default function SignupPage() {
     
     if (!validateForm()) return
     
+    // Store signup expects (firstName, lastName, email, company, password, confirmPassword)
     const success = await signup(
-      formData.firstName,
-      formData.lastName,
+      formData.name,
+      '',
       formData.email,
-      formData.company,
+      '',
       formData.password,
       confirmPassword
     )
@@ -99,46 +94,28 @@ export default function SignupPage() {
 
         <Card className="border-0 shadow-2xl bg-white/95 backdrop-blur-sm ring-1 ring-gray-100">
           <CardHeader className="text-center pb-6">
-            <CardTitle className="text-2xl font-bold text-gray-900">Create your account</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gray-900">Unlock Your Access</CardTitle>
             <CardDescription className="text-gray-600">
-              Start your free trial - no credit card required
+              Step Inside the Vault
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-sm font-medium text-gray-700">
-                    First name
-                  </Label>
-                  <Input
-                    id="firstName"
-                    placeholder="John"
-                    value={formData.firstName}
-                    onChange={(e) => setFormData({...formData, firstName: e.target.value})}
-                    className={`h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 ${fieldErrors.firstName ? 'border-red-500' : ''}`}
-                    disabled={isLoading}
-                  />
-                  {fieldErrors.firstName && (
-                    <p className="text-xs text-red-500">{fieldErrors.firstName}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-sm font-medium text-gray-700">
-                    Last name
-                  </Label>
-                  <Input
-                    id="lastName"
-                    placeholder="Doe"
-                    value={formData.lastName}
-                    onChange={(e) => setFormData({...formData, lastName: e.target.value})}
-                    className={`h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 ${fieldErrors.lastName ? 'border-red-500' : ''}`}
-                    disabled={isLoading}
-                  />
-                  {fieldErrors.lastName && (
-                    <p className="text-xs text-red-500">{fieldErrors.lastName}</p>
-                  )}
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+                  Full name
+                </Label>
+                <Input
+                  id="name"
+                  placeholder="John Doe"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  className={`h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 ${fieldErrors.name ? 'border-red-500' : ''}`}
+                  disabled={isLoading}
+                />
+                {fieldErrors.name && (
+                  <p className="text-xs text-red-500">{fieldErrors.name}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -159,19 +136,7 @@ export default function SignupPage() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="company" className="text-sm font-medium text-gray-700">
-                  Company name
-                </Label>
-                <Input
-                  id="company"
-                  placeholder="Acme Inc."
-                  value={formData.company}
-                  onChange={(e) => setFormData({...formData, company: e.target.value})}
-                  className="h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                  disabled={isLoading}
-                />
-              </div>
+              
 
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-sm font-medium text-gray-700">
@@ -221,24 +186,7 @@ export default function SignupPage() {
                 )}
               </div>
 
-              <div className="flex items-start space-x-3">
-                <Checkbox
-                  id="terms"
-                  checked={formData.agreeToTerms}
-                  onCheckedChange={(checked) => setFormData({...formData, agreeToTerms: checked as boolean})}
-                  className="mt-1"
-                  disabled={isLoading}
-                />
-                <Label htmlFor="terms" className="text-sm text-gray-600 leading-relaxed">
-                  I agree to the{' '}
-                  <Link href="/terms" className="text-blue-600 hover:text-blue-700">Terms of Service</Link>
-                  {' '}and{' '}
-                  <Link href="/privacy" className="text-blue-600 hover:text-blue-700">Privacy Policy</Link>
-                </Label>
-              </div>
-              {fieldErrors.terms && (
-                <p className="text-xs text-red-500">{fieldErrors.terms}</p>
-              )}
+              
 
               <Button 
                 type="submit"

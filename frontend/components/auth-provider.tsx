@@ -1,19 +1,13 @@
 'use client'
 
-import { useEffect, ReactNode } from 'react'
-import { useAuthStore } from '@/lib/stores/auth'
+import { ReactNode } from 'react'
 
 interface AuthProviderProps {
   children: ReactNode
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const { checkAuth } = useAuthStore()
-
-  useEffect(() => {
-    // Check authentication status when the app loads
-    checkAuth()
-  }, [])
-
+  // Auth state is managed by individual components as needed
+  // 401 responses from API calls will handle automatic logout
   return <>{children}</>
 }

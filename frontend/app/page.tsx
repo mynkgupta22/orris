@@ -41,11 +41,11 @@ export default function LandingPage() {
           
           <h1 className="text-5xl md:text-6xl font-bold mb-8 leading-tight">
   <span className="bg-gradient-to-r from-gray-900 via-blue-900 to-gray-900 bg-clip-text text-transparent">
-    ChatGPT for your company docs –
+    Your secure knowledge partner –
   </span>
   <br />
-  <span className="text-blue-600">knows your business</span>,{' '}
-  <span className="text-green-600">protects your people</span>
+  <span className="text-blue-600">Knows it all</span>,{' '}
+  <span className="text-green-600">Spills just enough.</span>
 </h1>
           
           <p className="text-xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed">
