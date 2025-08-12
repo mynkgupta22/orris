@@ -10,7 +10,8 @@ import os
 import logging  
 
 from google.auth.transport.requests import AuthorizedSession
-
+import httplib2  
+from google.auth.transport.httplib2 import AuthorizedHttp
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -113,7 +114,7 @@ from googleapiclient.discovery import build
 def get_drive_service() -> any:
     """
     Creates a Google Drive service client by securely loading credentials
-    directly from an environment variable. This is the standard method.
+    from an environment variable and explicitly disabling all file-based caching.
     """
     logger.info("Attempting to create Google Drive service from environment variable content.")
     creds_json_str = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_JSON')
@@ -125,14 +126,15 @@ def get_drive_service() -> any:
         creds_info = json.loads(creds_json_str)
         scopes_env = os.getenv("GOOGLE_DRIVE_SCOPES")
         scopes = [s.strip() for s in scopes_env.split(",")] if scopes_env else DEFAULT_SCOPES
-        
-        # --- THIS IS THE CRITICAL FIX ---
-        # The from_service_account_info method correctly builds the credentials object
-        # that the `build` function knows how to use without any manual http client setup.
         credentials = service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
-        
-        # We pass the credentials object directly. The `build` function handles the rest.
-        service = build("drive", "v3", credentials=credentials, cache_discovery=False)
+
+        # --- THIS IS THE DEFINITIVE FIX FOR THE FILE NOT FOUND ERROR ---
+        # 1. Create a basic httplib2.Http client with caching explicitly disabled.
+        http_client = httplib2.Http(cache=None)
+        # 2. Create an authorized transport by wrapping the client with our credentials.
+        authed_http = AuthorizedHttp(credentials, http=http_client)
+        # 3. Build the service using this custom, authorized, cacheless transport.
+        service = build("drive", "v3", http=authed_http, cache_discovery=False)
         # --- END OF FIX ---
 
         logger.info("Successfully created Google Drive service object.")
