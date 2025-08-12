@@ -9,6 +9,7 @@ import io
 import os
 import logging  
 
+from google.auth.transport.requests import AuthorizedSession
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -108,6 +109,7 @@ from googleapiclient.discovery import build
 #         logger.error(f"Failed to create Google Drive service: {e}") # You might need to import logger
 #         raise
 
+
 def get_drive_service() -> any:
     """
     Creates a Google Drive service client by securely loading credentials
@@ -126,12 +128,12 @@ def get_drive_service() -> any:
         credentials = service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
 
         # --- THIS IS THE CRITICAL FIX ---
-        # 1. Create a new Http object with all caching disabled.
-        http_client = httplib2.Http(cache=None)
-        # 2. Authorize this specific client instance with our credentials.
-        credentials.authorize(http_client)
-        # 3. Build the service using this custom, cacheless Http object.
-        service = build("drive", "v3", http=http_client, cache_discovery=False)
+        # 1. Create an authorized session object from the credentials.
+        #    This is the new, correct way to get an authorized HTTP client.
+        authed_session = AuthorizedSession(credentials)
+        # 2. Build the service using this authorized session.
+        #    The `build` function knows how to handle this session object.
+        service = build("drive", "v3", http=authed_session, cache_discovery=False)
         # --- END OF FIX ---
 
         logger.info("Successfully created Google Drive service object.")
