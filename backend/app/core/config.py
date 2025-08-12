@@ -47,7 +47,9 @@ class Settings(BaseSettings):
     
     # Embeddings
     nomic_api_key: str = ""
-    hugging_face_api_key: str = ""
+    huggingface_api_key: str = ""
+    embedding_model_name: str = "BAAI/bge-m3"
+    embed_batch_size: int = 8
 
     # Document Processing
     chunk_size: str = "800"
