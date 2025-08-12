@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from app.core.config import settings
+
 from app.routers import auth, users, webhooks
 from app.rag.api.retriever_router import router as rag_router
 from app.services.webhook_renewal import run_webhook_renewal_service
@@ -41,7 +42,7 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     # Start the webhook renewal service in the background
-    main_folder_id = Config.EVIDEV_DATA_FOLDER_ID
+    main_folder_id = "1NmJmAGWP4TMIzw4Algfl5OkiWgYdsfgh"
     
     if main_folder_id:
         try:
