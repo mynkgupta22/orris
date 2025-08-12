@@ -508,28 +508,104 @@ async def _scan_folder_for_changes(service, folder_id: str):
 
 
 # Function to set up Google Drive push notifications
-def setup_drive_webhook(webhook_url: str, folder_id: str) -> dict:
+# def setup_drive_webhook(webhook_url: str, folder_id: str) -> dict:
+#     """
+#     Set up Google Drive push notifications for a specific folder.
+    
+#     Args:
+#         webhook_url: Your webhook endpoint URL
+#         folder_id: Google Drive folder ID to watch
+        
+#     Returns:
+#         Channel information from Google
+#     """
+#     try: # <--- Wrap the function content in a try/except block
+#         # --- LOG #4: CONFIRM THIS FUNCTION IS BEING CALLED ---
+#         logger.info(f"Setting up webhook for folder_id: {folder_id} at url: {webhook_url}")
+        
+#         service = get_drive_service()
+        
+#         # --- LOG #5: CONFIRM SERVICE WAS CREATED ---
+#         logger.info("Google Drive service object received successfully in setup_drive_webhook.")
+        
+#         # ... rest of the function to create channel_body and call service.files().watch() ...
+        
+#         response = service.files().watch(
+#             fileId=folder_id,
+#             body=channel_body
+#         ).execute()
+        
+#         logger.info(f"Successfully set up webhook for folder {folder_id}: {response}")
+#         return response
+        
+#     except Exception as e:
+#         # --- LOG #6: CATCH THE ERROR HERE ---
+#         # This will catch the "No such file or directory" error and give us context
+#         logger.error(f"CRITICAL FAILURE in setup_drive_webhook for folder {folder_id}: {e}")
+#         raise 
+#     # service = get_drive_service()
+    
+#     # Channel configuration with unique ID
+#     import uuid
+#     unique_suffix = str(uuid.uuid4())[:8]
+#     channel_body = {
+#         'id': f'orris-sync-{folder_id}-{unique_suffix}',
+#         'type': 'web_hook',
+#         'address': webhook_url,
+#         'payload': True,
+#         'token': os.getenv("GOOGLE_WEBHOOK_TOKEN", "orris-webhook-token")
+#     }
+    
+#     try:
+#         # Watch the folder for changes
+#         response = service.files().watch(
+#             fileId=folder_id,
+#             body=channel_body
+#         ).execute()
+        
+#         logger.info(f"Set up webhook for folder {folder_id}: {response}")
+#         return response
+        
+#     except Exception as e:
+#         logger.error(f"Failed to set up webhook: {e}")
+#         raise
+
+def setup_drive_webhook(folder_id: str) -> dict:
     """
     Set up Google Drive push notifications for a specific folder.
+    It reads the base webhook URL from environment variables.
     
     Args:
-        webhook_url: Your webhook endpoint URL
         folder_id: Google Drive folder ID to watch
         
     Returns:
         Channel information from Google
     """
-    try: # <--- Wrap the function content in a try/except block
-        # --- LOG #4: CONFIRM THIS FUNCTION IS BEING CALLED ---
-        logger.info(f"Setting up webhook for folder_id: {folder_id} at url: {webhook_url}")
-        
+    # 1. Construct the full, correct webhook URL from the environment variable
+    base_url = os.environ.get("WEBHOOK_BASE_URL")
+    if not base_url:
+        raise ValueError("FATAL: WEBHOOK_BASE_URL environment variable is not set!")
+    
+    # Assuming your webhook endpoint is at '/webhooks/google-drive'
+    webhook_url = f"{base_url}/webhooks/google-drive"
+    
+    logger.info(f"Setting up webhook for folder_id: {folder_id} at calculated url: {webhook_url}")
+    
+    try:
         service = get_drive_service()
-        
-        # --- LOG #5: CONFIRM SERVICE WAS CREATED ---
         logger.info("Google Drive service object received successfully in setup_drive_webhook.")
         
-        # ... rest of the function to create channel_body and call service.files().watch() ...
+        # Define channel_body INSIDE the try block
+        unique_suffix = str(uuid.uuid4())[:8]
+        channel_body = {
+            'id': f'orris-sync-{folder_id}-{unique_suffix}',
+            'type': 'web_hook',
+            'address': webhook_url, # <-- Use the newly constructed URL
+            'payload': True,
+            'token': os.getenv("GOOGLE_WEBHOOK_TOKEN", "orris-webhook-token")
+        }
         
+        # Watch the folder for changes
         response = service.files().watch(
             fileId=folder_id,
             body=channel_body
@@ -539,33 +615,5 @@ def setup_drive_webhook(webhook_url: str, folder_id: str) -> dict:
         return response
         
     except Exception as e:
-        # --- LOG #6: CATCH THE ERROR HERE ---
-        # This will catch the "No such file or directory" error and give us context
         logger.error(f"CRITICAL FAILURE in setup_drive_webhook for folder {folder_id}: {e}")
-        raise 
-    # service = get_drive_service()
-    
-    # Channel configuration with unique ID
-    import uuid
-    unique_suffix = str(uuid.uuid4())[:8]
-    channel_body = {
-        'id': f'orris-sync-{folder_id}-{unique_suffix}',
-        'type': 'web_hook',
-        'address': webhook_url,
-        'payload': True,
-        'token': os.getenv("GOOGLE_WEBHOOK_TOKEN", "orris-webhook-token")
-    }
-    
-    try:
-        # Watch the folder for changes
-        response = service.files().watch(
-            fileId=folder_id,
-            body=channel_body
-        ).execute()
-        
-        logger.info(f"Set up webhook for folder {folder_id}: {response}")
-        return response
-        
-    except Exception as e:
-        logger.error(f"Failed to set up webhook: {e}")
         raise
