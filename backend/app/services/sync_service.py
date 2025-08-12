@@ -5,6 +5,8 @@ from datetime import datetime, UTC
 from pathlib import Path
 import asyncio
 from googleapiclient.errors import HttpError
+import uuid
+
 
 # Initialize logger early
 logger = logging.getLogger(__name__)
