@@ -9,12 +9,19 @@ from qdrant_client.http import models
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_huggingface import HuggingFaceEmbeddings
+
+# Removed HuggingFaceEmbeddings as it's replaced by our custom client
+# from langchain_huggingface import HuggingFaceEmbeddings
 
 from app.models.user import User
 from app.rag.config.config import Config
 from app.rag.pipeline.access_control import AccessController
 from app.rag.api.retriever_schemas import DocumentChunk, QueryResponse, AuditLog
+
+# --- Change Start: Import the custom embedding client ---
+# (Assuming embed.py is located alongside this file or is accessible via this path)
+from app.rag.core.embed import get_embedding_client 
+# --- Change End ---
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -35,11 +42,11 @@ class RetrievalPipeline:
         self.collection_name = Config.QDRANT_COLLECTION_NAME
         self.access_controller = AccessController()
 
-        # Embeddings: BGE-M3 (1024)
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name="BAAI/bge-m3",
-            encode_kwargs={"normalize_embeddings": True},
-        )
+        # --- Change Start: Use the custom API-based embedding client ---
+        # This ensures the same "BAAI/bge-large-en-v1.5" model is used via API
+        self.embedding_client = get_embedding_client()
+        logger.info(f"Initialized embedding client with model: {self.embedding_client.model_name}")
+        # --- Change End ---
 
         # LLM
         self.chat = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
@@ -84,11 +91,14 @@ class RetrievalPipeline:
             # 2) RBAC pre-filter for Qdrant
             access_filter: models.Filter = self.access_controller.build_access_filter(user)
 
-            # 3) Embed query and search Qdrant with RBAC filter
-            query_vector = self.embeddings.embed_query(sanitized_query)
+            # --- Change Start: Embed query using the custom API client ---
+            # encode_texts returns a batch, so we take the first result [0]
+            query_vector = self.embedding_client.encode_texts([sanitized_query])[0]
+            # --- Change End ---
+
             search_results = self.qdrant_client.search(
                 collection_name=self.collection_name,
-                query_vector=("text",query_vector),
+                query_vector=("text", query_vector), # Using named vector "text"
                 limit=top_k_pre,
                 with_payload=True,
                 with_vectors=False,
@@ -195,16 +205,17 @@ class RetrievalPipeline:
     def get_service_status(self) -> Dict:
         try:
             collection_info = self.qdrant_client.get_collection(self.collection_name)
+            # --- Change Start: Update status to reflect the correct embedding client details ---
+            embedding_dim = self.embedding_client.dimension
+            # --- Change End ---
             return {
                 "status": "healthy",
                 "collection_name": self.collection_name,
                 "total_vectors": collection_info.vectors_count,
                 "collection_status": collection_info.status,
-                "embedding_dimension": Config.EMBEDDING_DIMENSION,
+                "embedding_dimension": embedding_dim,
                 "qdrant_host": Config.QDRANT_HOST,
             }
         except Exception as e:
             logger.error(f"Failed to get service status: {e}")
             return {"status": "unhealthy", "error": str(e)}
-
-
