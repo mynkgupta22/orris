@@ -18,6 +18,8 @@ from app.rag.config.config import Config
 from app.rag.pipeline.access_control import AccessController
 from app.rag.api.retriever_schemas import DocumentChunk, RetrievedChunk
 
+import os
+
 # --- Change Start: Import the custom embedding client ---
 # (Assuming embed.py is located alongside this file or is accessible via this path)
 from app.rag.core.embed import get_embedding_client 
