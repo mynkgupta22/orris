@@ -1,5 +1,6 @@
 import logging
 import time
+import replicate
 from typing import List, Dict, Optional
 from uuid import UUID
 from datetime import datetime
@@ -9,12 +10,12 @@ from qdrant_client.http import models
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_huggingface import HuggingFaceEmbeddings
 
 from app.models.user import User
 from app.rag.config.config import Config
+from app.rag.core.embed import get_embedding_client
 from app.rag.pipeline.access_control import AccessController
-from app.rag.api.retriever_schemas import DocumentChunk, QueryResponse, AuditLog
+from app.rag.api.retriever_schemas import DocumentChunk, QueryResponse, AuditLog, ImageInfo
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -36,10 +37,7 @@ class RetrievalPipeline:
         self.access_controller = AccessController()
 
         # Embeddings: BGE-M3 (1024)
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name="BAAI/bge-m3",
-            encode_kwargs={"normalize_embeddings": True},
-        )
+        self.embeddings = get_embedding_client()
 
         # LLM
         self.chat = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
@@ -85,7 +83,7 @@ class RetrievalPipeline:
             access_filter: models.Filter = self.access_controller.build_access_filter(user)
 
             # 3) Embed query and search Qdrant with RBAC filter
-            query_vector = self.embeddings.embed_query(sanitized_query)
+            query_vector = self.embeddings.encode_texts([sanitized_query])[0].tolist()
             search_results = self.qdrant_client.search(
                 collection_name=self.collection_name,
                 query_vector=("text",query_vector),
@@ -129,9 +127,10 @@ class RetrievalPipeline:
                 context_parts = []
                 for i, ch in enumerate(final_chunks, 1):
                     snippet = ch.text[:800] + "..." if len(ch.text) > 800 else ch.text
-                    context_parts.append(
-                        f"Document {i} (Source: {ch.source_doc_name}, Page: {ch.source_page}):\n{snippet}"
-                    )
+                    doc_info = f"Document {i} (Source: {ch.source_doc_name}, Page: {ch.source_page})"
+                    if str(payload.get("is_image", "")).lower() == "true" and ch.doc_url:
+                        doc_info += f"\nImage URL: {ch.doc_url}"
+                    context_parts.append(f"{doc_info}:\n{snippet}")
                    
 
                 context_text = "\n\n---\n\n".join(context_parts)
@@ -157,10 +156,47 @@ class RetrievalPipeline:
                 ])
                 answer = getattr(llm_resp, "content", "") or ""
 
+                # full_prompt = (
+                #      f"[System]: {system_text.strip()}\n\n"
+                #      f"[Human]: {user_text.strip()}\n\n"
+                #      f"[Assistant]:"
+                # )
+
+                # output = replicate.run(
+                #      "tomasmcm/fin-llama-33b:d60d4e27c69c809632b91635c9319a6422f5d90e668d1abeb2d8c2dd758bb8ea",
+                #     input={
+                #       "prompt": full_prompt
+                #     }
+                # )
+                
+            # Replicate returns a generator or list, so join parts
+            #     if isinstance(output, list):
+            #         answer = "".join(output).strip()
+            #     else:
+            #         answer = str(output).strip()
+
             processing_time = int((time.time() - start_time) * 1000)
 
-            # 7) Build audit log (TODO: persist to DB)
-            # TODO: Persist audit with sanitized_query, user info, chunk IDs, timing, client info
+            # 7) Build chunk data for logging
+            chunks_for_log = [
+                {
+                    "id": chunk.id,
+                    "text": chunk.text,
+                    "score": chunk.score,
+                    "source_doc_name": chunk.source_doc_name,
+                    "source_doc_id": chunk.source_doc_id,
+                    "doc_type": chunk.doc_type,
+                    "source_page": chunk.source_page,
+                    "chunk_index": chunk.chunk_index,
+                    "is_pi": chunk.is_pi,
+                    "uid": chunk.uid,
+                    "doc_url": chunk.doc_url,
+                    "created_at": chunk.created_at
+                } 
+                for chunk in final_chunks
+            ]
+            
+            # Log audit info
             logger.info(
                 {
                     "audit_id": audit_id,
@@ -172,14 +208,30 @@ class RetrievalPipeline:
                     "processing_time_ms": processing_time,
                     "ip_address": ip_address,
                     "user_agent": user_agent,
+                    "retrieved_chunks": chunks_for_log
                 }
             )
 
             # 8) Build minimal response
+            # Extract image URLs from chunks where is_image=true
+            image_urls = [
+                ImageInfo(url=chunk.doc_url) 
+                for chunk in final_chunks 
+                if str(payload.get("is_image", "")).lower() == "true" and chunk.doc_url
+            ]
+            
+            # Additional context for query logging
+            context_meta = {
+                "system_prompt": system_text,
+                "user_prompt": user_text,
+                "chunks_used": chunks_for_log
+            }
+            
             return QueryResponse(
                 answer=answer,
                 query=sanitized_query,
                 session_id=session_id,
+                images=image_urls if image_urls else None
             )
 
         except Exception as e:

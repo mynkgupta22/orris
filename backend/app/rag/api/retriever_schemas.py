@@ -25,11 +25,16 @@ class DocumentChunk(BaseModel):
     created_at: str
     doc_url: str
     
+class ImageInfo(BaseModel):
+    """Image information for frontend rendering"""
+    url: str
+
 class QueryResponse(BaseModel):
     """Response model for retrieval queries (minimal)"""
     answer: str
     query: str
     session_id: UUID
+    images: Optional[List[ImageInfo]] = None  # Only include image URLs when needed
 
 class AuditLog(BaseModel):
     """Audit log entry for queries"""

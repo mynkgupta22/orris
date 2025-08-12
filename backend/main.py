@@ -1,10 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import asyncio
 from app.core.config import settings
 from app.routers import auth, users, webhooks
-from app.rag.retriever_router import router as rag_router
-from app.services.webhook_renewal import run_webhook_renewal_service
+from app.rag.api.retriever_router import router as rag_router
 
 app = FastAPI(
     title="Orris Authentication API",
@@ -34,11 +32,6 @@ async def root():
 @app.get("/health", tags=["health"])
 async def health_check():
     return {"status": "healthy"}
-
-@app.on_event("startup")
-async def startup_event():
-    # Start the webhook renewal service in the background
-    asyncio.create_task(run_webhook_renewal_service())
 
 if __name__ == "__main__":
     import uvicorn

@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     
     # Embeddings
     nomic_api_key: str = ""
+    hugging_face_api_key: str = ""
     
     # Document Processing
     chunk_size: str = "800"
