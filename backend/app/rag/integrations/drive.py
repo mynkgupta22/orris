@@ -6,11 +6,14 @@ from pathlib import Path
 from datetime import datetime
 import io
 import os
+import logging  
+
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
+logger = logging.getLogger(__name__) 
 
 DEFAULT_SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 
