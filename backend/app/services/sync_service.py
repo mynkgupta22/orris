@@ -611,7 +611,7 @@ def setup_drive_webhook(folder_id: str) -> dict:
         # Watch the folder for changes
         response = service.files().watch(
             fileId=folder_id,
-            json=channel_body
+            body=channel_body
         ).execute()
         
         logger.info(f"Successfully set up webhook for folder {folder_id}: {response}")

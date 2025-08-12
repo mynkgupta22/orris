@@ -113,7 +113,7 @@ from googleapiclient.discovery import build
 def get_drive_service() -> any:
     """
     Creates a Google Drive service client by securely loading credentials
-    from an environment variable and explicitly disabling all file-based caching.
+    directly from an environment variable. This is the standard method.
     """
     logger.info("Attempting to create Google Drive service from environment variable content.")
     creds_json_str = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_JSON')
@@ -125,15 +125,14 @@ def get_drive_service() -> any:
         creds_info = json.loads(creds_json_str)
         scopes_env = os.getenv("GOOGLE_DRIVE_SCOPES")
         scopes = [s.strip() for s in scopes_env.split(",")] if scopes_env else DEFAULT_SCOPES
-        credentials = service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
-
+        
         # --- THIS IS THE CRITICAL FIX ---
-        # 1. Create an authorized session object from the credentials.
-        #    This is the new, correct way to get an authorized HTTP client.
-        authed_session = AuthorizedSession(credentials)
-        # 2. Build the service using this authorized session.
-        #    The `build` function knows how to handle this session object.
-        service = build("drive", "v3", http=authed_session, cache_discovery=False)
+        # The from_service_account_info method correctly builds the credentials object
+        # that the `build` function knows how to use without any manual http client setup.
+        credentials = service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
+        
+        # We pass the credentials object directly. The `build` function handles the rest.
+        service = build("drive", "v3", credentials=credentials, cache_discovery=False)
         # --- END OF FIX ---
 
         logger.info("Successfully created Google Drive service object.")
