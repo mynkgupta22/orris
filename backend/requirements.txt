@@ -29,6 +29,7 @@ pyOpenSSL==25.1.0
 python-dotenv==1.1.1
 python_jose==3.3.0
 pyu2f==0.1.5
+psycopg2-binary==2.9.10
 qdrant_client==1.15.1
 railroad==0.5.0
 simplejson==3.20.1
