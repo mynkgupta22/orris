@@ -66,6 +66,8 @@ def get_drive_service() -> any:
       - GOOGLE_APPLICATION_CREDENTIALS_JSON: The full JSON content of the service account.
       - GOOGLE_DRIVE_SCOPES (optional, comma-separated)
     """
+
+    logger.info("Attempting to create Google Drive service from environment variable content.")
     # 1. Get the JSON content string from the environment variable.
     #    We use a specific name to make it clear we expect content, not a path.
     creds_json_str = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_JSON')
@@ -74,6 +76,9 @@ def get_drive_service() -> any:
     if not creds_json_str:
         # This error will appear in your Render logs if the variable is missing.
         raise ValueError("FATAL: The GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set.")
+    else:
+        # Log the first 50 characters to confirm it's not empty without printing the whole secret
+        logger.info(f"Found GOOGLE_APPLICATION_CREDENTIALS_JSON variable, starts with: {creds_json_str[:50]}...")
 
     try:
         # 3. Load the JSON string into a Python dictionary.
@@ -90,6 +95,8 @@ def get_drive_service() -> any:
 
         # 6. Build and return the Google Drive service object.
         service = build("drive", "v3", credentials=credentials, cache_discovery=False)
+        logger.info("Successfully created Google Drive service object.")
+
         return service
 
     except json.JSONDecodeError:

@@ -519,7 +519,31 @@ def setup_drive_webhook(webhook_url: str, folder_id: str) -> dict:
     Returns:
         Channel information from Google
     """
-    service = get_drive_service()
+    try: # <--- Wrap the function content in a try/except block
+        # --- LOG #4: CONFIRM THIS FUNCTION IS BEING CALLED ---
+        logger.info(f"Setting up webhook for folder_id: {folder_id} at url: {webhook_url}")
+        
+        service = get_drive_service()
+        
+        # --- LOG #5: CONFIRM SERVICE WAS CREATED ---
+        logger.info("Google Drive service object received successfully in setup_drive_webhook.")
+        
+        # ... rest of the function to create channel_body and call service.files().watch() ...
+        
+        response = service.files().watch(
+            fileId=folder_id,
+            body=channel_body
+        ).execute()
+        
+        logger.info(f"Successfully set up webhook for folder {folder_id}: {response}")
+        return response
+        
+    except Exception as e:
+        # --- LOG #6: CATCH THE ERROR HERE ---
+        # This will catch the "No such file or directory" error and give us context
+        logger.error(f"CRITICAL FAILURE in setup_drive_webhook for folder {folder_id}: {e}")
+        raise 
+    # service = get_drive_service()
     
     # Channel configuration with unique ID
     import uuid
