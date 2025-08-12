@@ -324,7 +324,7 @@ async def _process_single_document(service, file_metadata):
             logger.info(f"Deleted {deleted_count} existing chunks for {file_name}")
         
         # Download file to temporary location
-        tmp_dir = Path(os.getenv("INGEST_TMP_DIR", ".ingest_tmp"))
+        tmp_dir = Path(os.getenv("INGEST_TMP_DIR", "/tmp"))
         tmp_dir.mkdir(parents=True, exist_ok=True)
         
         dest_path = tmp_dir / f"webhook_{file_id}_{file_name}"
@@ -586,7 +586,8 @@ def setup_drive_webhook(folder_id: str) -> dict:
     # 1. Construct the full, correct webhook URL from the environment variable
     base_url = os.environ.get("WEBHOOK_BASE_URL")
     if not base_url:
-        raise ValueError("FATAL: WEBHOOK_BASE_URL environment variable is not set!")
+        logger.error("WEBHOOK_BASE_URL environment variable is not set!")
+        raise ValueError("WEBHOOK_BASE_URL environment variable is not set!")
     
     # Assuming your webhook endpoint is at '/webhooks/google-drive'
     webhook_url = f"{base_url}/webhooks/google-drive"

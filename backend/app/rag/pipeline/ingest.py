@@ -71,7 +71,7 @@ def main() -> None:
     gdrive_root_id = os.getenv("GDRIVE_ROOT_ID")
     local_path = os.getenv("INGEST_LOCAL_PATH")
     use_vision = os.getenv("USE_VISION", "true").lower() in {"1", "true", "yes"}  # Force enable for testing
-    tmp_dir = os.getenv("INGEST_TMP_DIR", ".ingest_tmp")
+    tmp_dir = os.getenv("INGEST_TMP_DIR", "/tmp")
 
     summarize_fn = summarize_image_llava if (use_vision and summarize_image_llava is not None) else None
     print(f"[DEBUG] Vision enabled: {use_vision}, summarize_fn available: {summarize_fn is not None}")

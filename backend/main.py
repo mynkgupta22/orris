@@ -41,6 +41,22 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     # Start the webhook renewal service in the background
+    main_folder_id = Config.EVIDEV_DATA_FOLDER_ID
+    
+    if main_folder_id:
+        try:
+            print(f"Ensuring webhook is active for main folder: {main_folder_id}")
+            # 1. Call Google to create the channel
+            new_channel_info = setup_drive_webhook(folder_id=main_folder_id)
+            
+            # 2. Save the new channel details to your database (the long-term fix)
+            # or to your webhook_channels.json (the temporary fix)
+            save_or_update_channel_info(new_channel_info) 
+            print(f"Webhook is active for main folder: {main_folder_id}")
+        except Exception as e:
+            print(f"Failed to set up main webhook: {e}")
+    else:
+        print("WARNING: EVIDEV_DATA_FOLDER_ID is not set. No webhooks will be created.")
     asyncio.create_task(run_webhook_renewal_service())
 
 @app.get(
