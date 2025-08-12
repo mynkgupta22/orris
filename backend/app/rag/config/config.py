@@ -31,8 +31,17 @@ class Config:
     @classmethod
     def validate(cls):
         """Validate required configuration"""
+        google_service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+        google_service_account_fields_exist = all([
+            os.getenv("GOOGLE_SERVICE_ACCOUNT_TYPE"),
+            os.getenv("GOOGLE_SERVICE_ACCOUNT_PROJECT_ID"),
+            os.getenv("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY"),
+            os.getenv("GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL"),
+            os.getenv("GOOGLE_SERVICE_ACCOUNT_CLIENT_ID")
+        ])
+        google_cred_file = cls.GOOGLE_SERVICE_ACCOUNT_PATH
+        google_creds_available = google_service_account_json or google_service_account_fields_exist or google_cred_file
         required_vars = [
-            'GOOGLE_SERVICE_ACCOUNT_PATH',
             'EVIDEV_DATA_FOLDER_ID',
             'NOMIC_API_KEY'
         ]
@@ -41,6 +50,9 @@ class Config:
         for var in required_vars:
             if not getattr(cls, var):
                 missing.append(var)
+
+        if not google_creds_available:
+            missing.append('Google service account credentials (GOOGLE_SERVICE_ACCOUNT_JSON, individual env vars, or GOOGLE_SERVICE_ACCOUNT_PATH)')        
         
         if missing:
             raise ValueError(f"Missing required environment variables: {', '.join(missing)}")

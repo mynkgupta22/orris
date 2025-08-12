@@ -66,14 +66,36 @@ class RetrievalPipeline:
         # LLM
         self.chat = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
 
+    # def _init_qdrant_client(self) -> QdrantClient:
+    #     try:
+    #         client = QdrantClient(host=Config.QDRANT_HOST, port=Config.QDRANT_PORT)
+    #         logger.info(f"Connected to Qdrant at {Config.QDRANT_HOST}:{Config.QDRANT_PORT}")
+    #         return client
+    #     except Exception as e:
+    #         logger.error(f"Failed to connect to Qdrant: {e}")
+    #         raise
     def _init_qdrant_client(self) -> QdrantClient:
-        try:
-            client = QdrantClient(host=Config.QDRANT_HOST, port=Config.QDRANT_PORT)
-            logger.info(f"Connected to Qdrant at {Config.QDRANT_HOST}:{Config.QDRANT_PORT}")
-            return client
-        except Exception as e:
-            logger.error(f"Failed to connect to Qdrant: {e}")
-            raise
+    """Initializes the Qdrant client using environment variables for cloud-native deployment."""
+    try:
+        qdrant_url = os.environ.get("QDRANT_URL")
+        qdrant_api_key = os.environ.get("QDRANT_API_KEY")
+
+        if not qdrant_url:
+            raise ValueError("QDRANT_URL environment variable is not set.")
+
+        # API key is optional for local instances but required for cloud
+        if "cloud.qdrant.io" in qdrant_url and not qdrant_api_key:
+            raise ValueError("QDRANT_API_KEY environment variable is required for Qdrant Cloud.")
+
+        client = QdrantClient(
+            url=qdrant_url,
+            api_key=qdrant_api_key,
+        )
+        logger.info(f"Successfully connected to Qdrant at {qdrant_url.split('@')[-1]}")
+        return client
+    except Exception as e:
+        logger.error(f"Failed to connect to Qdrant: {e}")
+        raise
 
     def _sanitize_query(self, query: str) -> str:
         """Basic regex-based sanitization to mitigate prompt injection."""

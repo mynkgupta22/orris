@@ -26,24 +26,76 @@ class DriveFile:
     path_segments: List[str]  # logical path from provided root
 
 
+# def get_drive_service() -> any:
+#     """Create a Google Drive API client using a service account file.
+
+#     Environment variables:
+#       - GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_FILE: path to JSON
+#       - GOOGLE_DRIVE_SCOPES (optional, comma-separated)
+#     """
+#     cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv(
+#         "GOOGLE_SERVICE_ACCOUNT_FILE"
+#     )
+#     if not cred_path:
+#         raise RuntimeError(
+#             "Set GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_FILE to your service account JSON."
+#         )
+#     scopes_env = os.getenv("GOOGLE_DRIVE_SCOPES")
+#     scopes = [s.strip() for s in scopes_env.split(",")] if scopes_env else DEFAULT_SCOPES
+#     creds = service_account.Credentials.from_service_account_file(cred_path, scopes=scopes)
+#     return build("drive", "v3", credentials=creds, cache_discovery=False)
+
+# In file: app/rag/integrations/drive.py
+
+import os
+import json
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+
+# --- This is the function you must replace ---
+
 def get_drive_service() -> any:
-    """Create a Google Drive API client using a service account file.
+    """
+    Creates a Google Drive service client by securely loading credentials
+    directly from an environment variable containing the JSON content.
 
     Environment variables:
-      - GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_FILE: path to JSON
+      - GOOGLE_APPLICATION_CREDENTIALS_JSON: The full JSON content of the service account.
       - GOOGLE_DRIVE_SCOPES (optional, comma-separated)
     """
-    cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv(
-        "GOOGLE_SERVICE_ACCOUNT_FILE"
-    )
-    if not cred_path:
-        raise RuntimeError(
-            "Set GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_FILE to your service account JSON."
+    # 1. Get the JSON content string from the environment variable.
+    #    We use a specific name to make it clear we expect content, not a path.
+    creds_json_str = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+
+    # 2. Check if the variable exists and raise a clear error if it doesn't.
+    if not creds_json_str:
+        # This error will appear in your Render logs if the variable is missing.
+        raise ValueError("FATAL: The GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set.")
+
+    try:
+        # 3. Load the JSON string into a Python dictionary.
+        creds_info = json.loads(creds_json_str)
+
+        # 4. Load scopes from environment or use default.
+        scopes_env = os.getenv("GOOGLE_DRIVE_SCOPES")
+        scopes = [s.strip() for s in scopes_env.split(",")] if scopes_env else DEFAULT_SCOPES
+
+        # 5. Use the special 'from_service_account_info' method to create credentials.
+        credentials = service_account.Credentials.from_service_account_info(
+            creds_info, scopes=scopes
         )
-    scopes_env = os.getenv("GOOGLE_DRIVE_SCOPES")
-    scopes = [s.strip() for s in scopes_env.split(",")] if scopes_env else DEFAULT_SCOPES
-    creds = service_account.Credentials.from_service_account_file(cred_path, scopes=scopes)
-    return build("drive", "v3", credentials=creds, cache_discovery=False)
+
+        # 6. Build and return the Google Drive service object.
+        service = build("drive", "v3", credentials=credentials, cache_discovery=False)
+        return service
+
+    except json.JSONDecodeError:
+        # This error will appear if the pasted JSON is invalid.
+        raise ValueError("FATAL: The GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable contains invalid JSON.")
+    except Exception as e:
+        # Log any other errors during service creation.
+        logger.error(f"Failed to create Google Drive service: {e}") # You might need to import logger
+        raise
 
 
 def _list_children(service, folder_id: str) -> List[dict]:
