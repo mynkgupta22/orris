@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import httplib2
 from dataclasses import dataclass
 from typing import Dict, Generator, Iterable, List, Optional, Tuple
 from pathlib import Path
@@ -57,56 +58,88 @@ from googleapiclient.discovery import build
 
 # --- This is the function you must replace ---
 
+# def get_drive_service() -> any:
+#     """
+#     Creates a Google Drive service client by securely loading credentials
+#     directly from an environment variable containing the JSON content.
+
+#     Environment variables:
+#       - GOOGLE_APPLICATION_CREDENTIALS_JSON: The full JSON content of the service account.
+#       - GOOGLE_DRIVE_SCOPES (optional, comma-separated)
+#     """
+
+#     logger.info("Attempting to create Google Drive service from environment variable content.")
+#     # 1. Get the JSON content string from the environment variable.
+#     #    We use a specific name to make it clear we expect content, not a path.
+#     creds_json_str = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+
+#     # 2. Check if the variable exists and raise a clear error if it doesn't.
+#     if not creds_json_str:
+#         # This error will appear in your Render logs if the variable is missing.
+#         raise ValueError("FATAL: The GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set.")
+#     else:
+#         # Log the first 50 characters to confirm it's not empty without printing the whole secret
+#         logger.info(f"Found GOOGLE_APPLICATION_CREDENTIALS_JSON variable, starts with: {creds_json_str[:50]}...")
+
+#     try:
+#         # 3. Load the JSON string into a Python dictionary.
+#         creds_info = json.loads(creds_json_str)
+
+#         # 4. Load scopes from environment or use default.
+#         scopes_env = os.getenv("GOOGLE_DRIVE_SCOPES")
+#         scopes = [s.strip() for s in scopes_env.split(",")] if scopes_env else DEFAULT_SCOPES
+
+#         # 5. Use the special 'from_service_account_info' method to create credentials.
+#         credentials = service_account.Credentials.from_service_account_info(
+#             creds_info, scopes=scopes
+#         )
+
+#         # 6. Build and return the Google Drive service object.
+#         service = build("drive", "v3", credentials=credentials, cache_discovery=False)
+#         logger.info("Successfully created Google Drive service object.")
+
+#         return service
+
+#     except json.JSONDecodeError:
+#         # This error will appear if the pasted JSON is invalid.
+#         raise ValueError("FATAL: The GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable contains invalid JSON.")
+#     except Exception as e:
+#         # Log any other errors during service creation.
+#         logger.error(f"Failed to create Google Drive service: {e}") # You might need to import logger
+#         raise
+
 def get_drive_service() -> any:
     """
     Creates a Google Drive service client by securely loading credentials
-    directly from an environment variable containing the JSON content.
-
-    Environment variables:
-      - GOOGLE_APPLICATION_CREDENTIALS_JSON: The full JSON content of the service account.
-      - GOOGLE_DRIVE_SCOPES (optional, comma-separated)
+    from an environment variable and explicitly disabling all file-based caching.
     """
-
     logger.info("Attempting to create Google Drive service from environment variable content.")
-    # 1. Get the JSON content string from the environment variable.
-    #    We use a specific name to make it clear we expect content, not a path.
     creds_json_str = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_JSON')
 
-    # 2. Check if the variable exists and raise a clear error if it doesn't.
     if not creds_json_str:
-        # This error will appear in your Render logs if the variable is missing.
         raise ValueError("FATAL: The GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set.")
-    else:
-        # Log the first 50 characters to confirm it's not empty without printing the whole secret
-        logger.info(f"Found GOOGLE_APPLICATION_CREDENTIALS_JSON variable, starts with: {creds_json_str[:50]}...")
 
     try:
-        # 3. Load the JSON string into a Python dictionary.
         creds_info = json.loads(creds_json_str)
-
-        # 4. Load scopes from environment or use default.
         scopes_env = os.getenv("GOOGLE_DRIVE_SCOPES")
         scopes = [s.strip() for s in scopes_env.split(",")] if scopes_env else DEFAULT_SCOPES
+        credentials = service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
 
-        # 5. Use the special 'from_service_account_info' method to create credentials.
-        credentials = service_account.Credentials.from_service_account_info(
-            creds_info, scopes=scopes
-        )
+        # --- THIS IS THE CRITICAL FIX ---
+        # 1. Create a new Http object with all caching disabled.
+        http_client = httplib2.Http(cache=None)
+        # 2. Authorize this specific client instance with our credentials.
+        credentials.authorize(http_client)
+        # 3. Build the service using this custom, cacheless Http object.
+        service = build("drive", "v3", http=http_client, cache_discovery=False)
+        # --- END OF FIX ---
 
-        # 6. Build and return the Google Drive service object.
-        service = build("drive", "v3", credentials=credentials, cache_discovery=False)
         logger.info("Successfully created Google Drive service object.")
-
         return service
 
-    except json.JSONDecodeError:
-        # This error will appear if the pasted JSON is invalid.
-        raise ValueError("FATAL: The GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable contains invalid JSON.")
     except Exception as e:
-        # Log any other errors during service creation.
-        logger.error(f"Failed to create Google Drive service: {e}") # You might need to import logger
+        logger.error(f"Failed to create Google Drive service: {e}")
         raise
-
 
 def _list_children(service, folder_id: str) -> List[dict]:
     q = f"'{folder_id}' in parents and trashed=false"
