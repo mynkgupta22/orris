@@ -17,6 +17,7 @@ google-api-python-client
 h2==4.2.0
 httpx==0.28.1
 Jinja2==3.1.6
+google-auth-httplib2
 js==1.0
 langchain==0.3.27
 langchain_core==0.3.74
