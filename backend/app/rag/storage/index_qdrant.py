@@ -14,8 +14,8 @@ from qdrant_client.models import (
 )
 
 from app.rag.config.config import load_qdrant_config
-from app.rag.schemas import DocumentChunk
-from app.rag.embed import EmbeddingClient, get_embedding_client
+from app.rag.core.schemas import DocumentChunk
+from app.rag.core.embed import EmbeddingClient, get_embedding_client
 
 
 def get_client() -> QdrantClient:

@@ -3,8 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Optional
 import os
-
+import httpx
 import numpy as np
+from app.core.config import get_settings
+
+settings = get_settings()
+
 
 try:
     import torch  # type: ignore

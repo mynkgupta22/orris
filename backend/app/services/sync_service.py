@@ -6,12 +6,11 @@ from pathlib import Path
 import asyncio
 from googleapiclient.errors import HttpError
 
-from app.rag.integrations.drive import get_drive_service
+from app.rag.integrations.drive import get_drive_service, resolve_type_from_mime, classify_from_path, download_file
 from app.rag.storage.sync_tracker import track_document_sync, mark_document_synced, mark_document_failed, document_needs_resync
 from app.rag.storage.index_qdrant import delete_document_chunks, upsert_document_chunks
-from app.rag.loaders import load_file_to_elements
-from app.rag.chunking import chunk_elements
-from app.rag.drive import resolve_type_from_mime, classify_from_path, download_file
+from app.rag.core.loaders import load_file_to_elements
+from app.rag.core.chunking import chunk_elements
 import json
 
 logger = logging.getLogger(__name__)

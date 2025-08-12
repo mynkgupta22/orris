@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from app.core.config import settings
 from app.routers import auth, users, webhooks
-from app.rag.retriever_router import router as rag_router
+from app.rag.api.retriever_router import router as rag_router
 from app.services.webhook_renewal import run_webhook_renewal_service
 
 app = FastAPI(
