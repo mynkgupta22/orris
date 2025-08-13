@@ -49,6 +49,12 @@ def chunk_elements(
         if not text.strip():
             continue
 
+        # Debug: Check if image_base64 is present
+        if meta_dict.get("is_image") and "image_base64" in meta_dict:
+            print(f"[DEBUG] Chunking: Found image_base64 in metadata: {len(meta_dict['image_base64'])} chars")
+        elif meta_dict.get("is_image"):
+            print("[DEBUG] Chunking: Image chunk but no image_base64 in metadata")
+
         meta = ChunkMeta(**{
             **meta_dict,
             "chunk_id": str(uuid4()),

@@ -40,6 +40,7 @@ class ChunkMeta(BaseModel):
     is_image: bool = False
     image_summary: Optional[str] = None
     image_url: Optional[str] = None
+    image_base64: Optional[str] = None  # Base64 encoding of the image
     thumbnail_url: Optional[str] = None
     # Spreadsheet context (optional)
     sheet_name: Optional[str] = None

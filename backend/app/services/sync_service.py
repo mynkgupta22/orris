@@ -11,6 +11,13 @@ from app.rag.storage.sync_tracker import track_document_sync, mark_document_sync
 from app.rag.storage.index_qdrant import delete_document_chunks, upsert_document_chunks
 from app.rag.core.loaders import load_file_to_elements
 from app.rag.core.chunking import chunk_elements
+
+try:
+    from app.rag.integrations.vision import summarize_image_with_base64
+    vision_available = True
+except ImportError:
+    summarize_image_with_base64 = None
+    vision_available = False
 import json
 
 logger = logging.getLogger(__name__)
@@ -353,7 +360,11 @@ async def _process_single_document(service, file_metadata):
         
         # Process document
         try:
-            elements = load_file_to_elements(str(dest_path), base_meta)
+            # Use vision with base64 encoding if available
+            if vision_available and summarize_image_with_base64:
+                elements = load_file_to_elements(str(dest_path), base_meta, summarize_image_with_base64_fn=summarize_image_with_base64)
+            else:
+                elements = load_file_to_elements(str(dest_path), base_meta)
             chunks = chunk_elements(elements)
             
             if chunks:
