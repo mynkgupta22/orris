@@ -90,6 +90,13 @@ def upsert_document_chunks(
             # Fill small metadata adds at index time
             meta = batch[j].meta
             payload = meta.model_dump()
+            
+            # Debug: Check if image_base64 is in payload
+            if payload.get("is_image") and "image_base64" in payload:
+                print(f"[DEBUG] Storing image chunk with base64: {len(payload['image_base64'])} chars")
+            elif payload.get("is_image"):
+                print("[DEBUG] Storing image chunk but no base64 in payload")
+            
             payload.setdefault("embedding_model", emb.model_name)
             payload.setdefault("embedding_dim", emb.dimension)
             payload.setdefault("pipeline_version", os.getenv("PIPELINE_VERSION", "0.1.0"))

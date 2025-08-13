@@ -126,7 +126,23 @@ class RetrievalPipeline:
             # 5) Select post-k
             final_chunks = sorted(candidate_chunks, key=lambda x: x.score, reverse=True)[:top_k_post]
 
-            # 6) Build context and call LLM (user message only contains user query)
+            # 6) Extract image_base64 from the most similar chunk (first one)
+            image_base64 = None
+            if final_chunks:
+                # Get image_base64 from the most similar chunk's metadata if available
+                first_chunk_id = final_chunks[0].id
+                try:
+                    chunk_result = self.qdrant_client.retrieve(
+                        collection_name=self.collection_name,
+                        ids=[first_chunk_id],
+                        with_payload=True
+                    )
+                    if chunk_result and chunk_result[0].payload:
+                        image_base64 = chunk_result[0].payload.get("image_base64")
+                except Exception as e:
+                    logger.warning(f"Failed to retrieve image_base64 from chunk {first_chunk_id}: {e}")
+
+            # 7) Build context and call LLM (user message only contains user query)
             if not final_chunks:
                 answer = (
                     "I don't have access to any relevant documents to answer your question."
@@ -188,6 +204,7 @@ class RetrievalPipeline:
                 answer=answer,
                 query=sanitized_query,
                 session_id=session_id,
+                image_base64=image_base64,
             )
 
         except Exception as e:
@@ -198,6 +215,7 @@ class RetrievalPipeline:
                 ),
                 query=query,
                 session_id=session_id,
+                image_base64=None,
             )
 
     def get_service_status(self) -> Dict:
