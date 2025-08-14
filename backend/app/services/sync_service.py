@@ -5,15 +5,26 @@ from datetime import datetime, UTC
 from pathlib import Path
 import asyncio
 from googleapiclient.errors import HttpError
+import uuid
+
+
+# Initialize logger early
+logger = logging.getLogger(__name__)
 
 from app.rag.integrations.drive import get_drive_service, resolve_type_from_mime, classify_from_path, download_file
 from app.rag.storage.sync_tracker import track_document_sync, mark_document_synced, mark_document_failed, document_needs_resync
 from app.rag.storage.index_qdrant import delete_document_chunks, upsert_document_chunks
 from app.rag.core.loaders import load_file_to_elements
 from app.rag.core.chunking import chunk_elements
+from app.rag.core.extractors import extract_pdf_images, extract_docx_images
 import json
 
-logger = logging.getLogger(__name__)
+try:
+    from app.rag.integrations.vision import summarize_image_llava
+    logger.info("Successfully imported LLaVA vision module for webhook processing.")
+except Exception as e:
+    logger.warning(f"Could not import LLaVA vision module for webhook: {e}")
+    summarize_image_llava = None
 
 
 def _get_folder_id_from_channel(channel_id: Optional[str]) -> Optional[str]:
@@ -313,7 +324,7 @@ async def _process_single_document(service, file_metadata):
             logger.info(f"Deleted {deleted_count} existing chunks for {file_name}")
         
         # Download file to temporary location
-        tmp_dir = Path(os.getenv("INGEST_TMP_DIR", ".ingest_tmp"))
+        tmp_dir = Path(os.getenv("INGEST_TMP_DIR", "/tmp"))
         tmp_dir.mkdir(parents=True, exist_ok=True)
         
         dest_path = tmp_dir / f"webhook_{file_id}_{file_name}"
@@ -353,7 +364,31 @@ async def _process_single_document(service, file_metadata):
         
         # Process document
         try:
-            elements = load_file_to_elements(str(dest_path), base_meta)
+            # Enable vision summarization if available
+            use_vision = os.getenv("USE_VISION", "true").lower() in {"1", "true", "yes"}
+            summarize_fn = summarize_image_llava if (use_vision and summarize_image_llava is not None) else None
+            
+            # Optional: extract images for PDFs and DOCX
+            image_lookup = None
+            if dtype == "pdf":
+                extracted_dir = tmp_dir / "_images" / file_id
+                page_map = extract_pdf_images(str(dest_path), str(extracted_dir))
+                def _lookup(page_no: int):
+                    return page_map.get(page_no, [])
+                image_lookup = _lookup
+            elif dtype == "docx":
+                extracted_dir = tmp_dir / "_images" / file_id
+                img_paths = extract_docx_images(str(dest_path), str(extracted_dir))
+                def _lookup(_: int):
+                    return img_paths
+                image_lookup = _lookup
+
+            elements = load_file_to_elements(
+                str(dest_path), 
+                base_meta, 
+                summarize_image_fn=summarize_fn, 
+                image_lookup=image_lookup
+            )
             chunks = chunk_elements(elements)
             
             if chunks:
@@ -475,40 +510,113 @@ async def _scan_folder_for_changes(service, folder_id: str):
 
 
 # Function to set up Google Drive push notifications
-def setup_drive_webhook(webhook_url: str, folder_id: str) -> dict:
+# def setup_drive_webhook(webhook_url: str, folder_id: str) -> dict:
+#     """
+#     Set up Google Drive push notifications for a specific folder.
+    
+#     Args:
+#         webhook_url: Your webhook endpoint URL
+#         folder_id: Google Drive folder ID to watch
+        
+#     Returns:
+#         Channel information from Google
+#     """
+#     try: # <--- Wrap the function content in a try/except block
+#         # --- LOG #4: CONFIRM THIS FUNCTION IS BEING CALLED ---
+#         logger.info(f"Setting up webhook for folder_id: {folder_id} at url: {webhook_url}")
+        
+#         service = get_drive_service()
+        
+#         # --- LOG #5: CONFIRM SERVICE WAS CREATED ---
+#         logger.info("Google Drive service object received successfully in setup_drive_webhook.")
+        
+#         # ... rest of the function to create channel_body and call service.files().watch() ...
+        
+#         response = service.files().watch(
+#             fileId=folder_id,
+#             body=channel_body
+#         ).execute()
+        
+#         logger.info(f"Successfully set up webhook for folder {folder_id}: {response}")
+#         return response
+        
+#     except Exception as e:
+#         # --- LOG #6: CATCH THE ERROR HERE ---
+#         # This will catch the "No such file or directory" error and give us context
+#         logger.error(f"CRITICAL FAILURE in setup_drive_webhook for folder {folder_id}: {e}")
+#         raise 
+#     # service = get_drive_service()
+    
+#     # Channel configuration with unique ID
+#     import uuid
+#     unique_suffix = str(uuid.uuid4())[:8]
+#     channel_body = {
+#         'id': f'orris-sync-{folder_id}-{unique_suffix}',
+#         'type': 'web_hook',
+#         'address': webhook_url,
+#         'payload': True,
+#         'token': os.getenv("GOOGLE_WEBHOOK_TOKEN", "orris-webhook-token")
+#     }
+    
+#     try:
+#         # Watch the folder for changes
+#         response = service.files().watch(
+#             fileId=folder_id,
+#             body=channel_body
+#         ).execute()
+        
+#         logger.info(f"Set up webhook for folder {folder_id}: {response}")
+#         return response
+        
+#     except Exception as e:
+#         logger.error(f"Failed to set up webhook: {e}")
+#         raise
+
+def setup_drive_webhook(folder_id: str) -> dict:
     """
     Set up Google Drive push notifications for a specific folder.
+    It reads the base webhook URL from environment variables.
     
     Args:
-        webhook_url: Your webhook endpoint URL
         folder_id: Google Drive folder ID to watch
         
     Returns:
         Channel information from Google
     """
-    service = get_drive_service()
+    # 1. Construct the full, correct webhook URL from the environment variable
+    base_url = os.environ.get("WEBHOOK_BASE_URL")
+    if not base_url:
+        logger.error("WEBHOOK_BASE_URL environment variable is not set!")
+        raise ValueError("WEBHOOK_BASE_URL environment variable is not set!")
     
-    # Channel configuration with unique ID
-    import uuid
-    unique_suffix = str(uuid.uuid4())[:8]
-    channel_body = {
-        'id': f'orris-sync-{folder_id}-{unique_suffix}',
-        'type': 'web_hook',
-        'address': webhook_url,
-        'payload': True,
-        'token': os.getenv("GOOGLE_WEBHOOK_TOKEN", "orris-webhook-token")
-    }
+    # Assuming your webhook endpoint is at '/webhooks/google-drive'
+    webhook_url = f"{base_url}/webhooks/google-drive"
+    
+    logger.info(f"Setting up webhook for folder_id: {folder_id} at calculated url: {webhook_url}")
     
     try:
+        service = get_drive_service()
+        logger.info("Google Drive service object received successfully in setup_drive_webhook.")
+        
+        # Define channel_body INSIDE the try block
+        unique_suffix = str(uuid.uuid4())[:8]
+        channel_body = {
+            'id': f'orris-sync-{folder_id}-{unique_suffix}',
+            'type': 'web_hook',
+            'address': webhook_url, # <-- Use the newly constructed URL
+            'payload': True,
+            'token': os.getenv("GOOGLE_WEBHOOK_TOKEN", "orris-webhook-token")
+        }
+        
         # Watch the folder for changes
         response = service.files().watch(
             fileId=folder_id,
             body=channel_body
         ).execute()
         
-        logger.info(f"Set up webhook for folder {folder_id}: {response}")
+        logger.info(f"Successfully set up webhook for folder {folder_id}: {response}")
         return response
         
     except Exception as e:
-        logger.error(f"Failed to set up webhook: {e}")
+        logger.error(f"CRITICAL FAILURE in setup_drive_webhook for folder {folder_id}: {e}")
         raise

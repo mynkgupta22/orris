@@ -12,8 +12,8 @@ from app.core.database import get_sync_db
 from app.models.user import User, UserRole
 from app.services.chat_service import ChatService
 from sqlalchemy.orm import Session
-from app.rag.pipeline.retrieval_pipeline import RetrievalPipeline
-from app.rag.api.retriever_schemas import QueryRequest, QueryResponse
+from app.rag.pipeline.retrieval_pipeline import RetrievalPipeline, RAGResponse
+from app.rag.api.retriever_schemas import QueryRequest, APIQueryResponse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -24,13 +24,13 @@ router = APIRouter(prefix="/rag", tags=["RAG Retriever"])
 # Initialize retriever service
 retriever_service = RetrievalPipeline()
 
-@router.post("/query", response_model=QueryResponse)
+@router.post("/query", response_model=APIQueryResponse)
 async def query_documents(
     request: QueryRequest,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_sync_db),
     http_request: Request = None
-) -> QueryResponse:
+) -> APIQueryResponse:
     """
     Query documents using RAG with role-based access control and chat history
     
@@ -97,11 +97,19 @@ async def query_documents(
             user_agent=user_agent 
         )
         
-        # Add assistant response to chat session
+        # Determine if the top result is an image to avoid "sticky" images
+        first_image_base64 = None
+        if rag_response.retrieved_chunks:
+            top_chunk = rag_response.retrieved_chunks[0]
+            if top_chunk.payload.get("is_image") and top_chunk.payload.get("image_base64"):
+                first_image_base64 = top_chunk.payload.get("image_base64")
+
+        # Add assistant response to chat session, now including image data if present
         chat_service.add_assistant_response(
             chat_session.session_id, 
             current_user.id, 
-            rag_response.answer
+            rag_response.answer,
+            image_base64=first_image_base64  # Pass image data to be saved
         )
         
         # Calculate processing time
@@ -126,8 +134,15 @@ async def query_documents(
             user_agent=user_agent
         )
         
-        # Return response (session_id already included in rag_response)
-        return rag_response
+        # Create the final API response
+        final_response = APIQueryResponse(
+            answer=rag_response.answer,
+            query=rag_response.query,
+            session_id=rag_response.session_id,
+            image_base64=rag_response.image_base64
+        )
+        
+        return final_response
         
     except HTTPException:
         # Re-raise HTTP exceptions (like 404 for invalid session_id)

@@ -13,7 +13,7 @@ Notes:
 
 import os
 import base64
-from typing import Optional
+from typing import Optional, Tuple
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -51,8 +51,8 @@ def _encode_image(image_path: str) -> str:
         return base64.b64encode(image_file.read()).decode('utf-8')
 
 
-def summarize_image_llava(image_path: str) -> str:
-    """Return a concise description/summary for graphs or images using GPT-4o-mini.
+def summarize_image_llava(image_path: str) -> Tuple[str, str]:
+    """Return a concise description/summary and base64 encoding for graphs or images.
 
     Keep the output short and informative for indexing.
     """
@@ -83,6 +83,7 @@ def summarize_image_llava(image_path: str) -> str:
         max_tokens=150
     )
     
-    return response.choices[0].message.content.strip() if response.choices[0].message.content else ""
+    summary = response.choices[0].message.content.strip() if response.choices[0].message.content else ""
+    return summary, base64_image
 
 

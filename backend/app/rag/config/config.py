@@ -9,12 +9,14 @@ load_dotenv(dotenv_path=env_path)
 
 class Config:
     # Google Drive
-    GOOGLE_SERVICE_ACCOUNT_PATH = os.getenv('GOOGLE_SERVICE_ACCOUNT_PATH')
+    GOOGLE_SERVICE_ACCOUNT_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
     EVIDEV_DATA_FOLDER_ID = os.getenv('EVIDEV_DATA_FOLDER_ID')
     
     # Qdrant
     QDRANT_HOST = os.getenv('QDRANT_HOST', 'localhost')
     QDRANT_PORT = int(os.getenv('QDRANT_PORT', 6333))
+    QDRANT_URL = os.getenv('QDRANT_URL')
+    QDRANT_API_KEY = os.getenv('QDRANT_API_KEY')
     QDRANT_COLLECTION_NAME = os.getenv('QDRANT_COLLECTION_NAME', 'orris_rag')
     
     # Nomic
@@ -31,8 +33,17 @@ class Config:
     @classmethod
     def validate(cls):
         """Validate required configuration"""
+        google_service_account_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+        google_service_account_fields_exist = all([
+            os.getenv("GOOGLE_SERVICE_ACCOUNT_TYPE"),
+            os.getenv("GOOGLE_SERVICE_ACCOUNT_PROJECT_ID"),
+            os.getenv("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY"),
+            os.getenv("GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL"),
+            os.getenv("GOOGLE_SERVICE_ACCOUNT_CLIENT_ID")
+        ])
+        google_cred_file = cls.GOOGLE_SERVICE_ACCOUNT_PATH
+        google_creds_available = google_service_account_json or google_service_account_fields_exist or google_cred_file
         required_vars = [
-            'GOOGLE_SERVICE_ACCOUNT_PATH',
             'EVIDEV_DATA_FOLDER_ID',
             'NOMIC_API_KEY'
         ]
@@ -41,6 +52,9 @@ class Config:
         for var in required_vars:
             if not getattr(cls, var):
                 missing.append(var)
+
+        if not google_creds_available:
+            missing.append('Google service account credentials (GOOGLE_SERVICE_ACCOUNT_JSON, individual env vars, or GOOGLE_SERVICE_ACCOUNT_PATH)')        
         
         if missing:
             raise ValueError(f"Missing required environment variables: {', '.join(missing)}")

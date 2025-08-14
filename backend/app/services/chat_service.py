@@ -1,5 +1,6 @@
+import logging
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, UTC
 from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
@@ -8,6 +9,7 @@ from app.models.chat_history import ChatHistory
 from app.models.query_log import QueryLog
 from app.models.user import User
 
+logger = logging.getLogger(__name__)
 
 class ChatService:
     def __init__(self, db: Session):
@@ -15,7 +17,7 @@ class ChatService:
 
     def create_chat_session(self, user_id: int, first_question: str) -> ChatHistory:
         """Create a new chat session with the first user question"""
-        expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+        expires_at = datetime.now(UTC) + timedelta(days=30)
         
         chat_session = ChatHistory(
             user_id=user_id,
@@ -28,7 +30,7 @@ class ChatService:
         chat_session.add_message(
             role="human",
             content=first_question,
-            timestamp=datetime.now(timezone.utc).isoformat()
+            timestamp=datetime.now(UTC).isoformat()
         )
         
         self.db.add(chat_session)
@@ -53,20 +55,27 @@ class ChatService:
         except NoResultFound:
             return None
 
-    def add_assistant_response(self, session_id: UUID, user_id: int, response: str) -> bool:
-        """Add assistant response to existing chat session"""
-        chat_session = self.get_chat_session(session_id, user_id)
-        if not chat_session:
-            return False
-            
-        chat_session.add_message(
+    def add_assistant_response(self, session_id: UUID, user_id: int, content: str, image_base64: Optional[str] = None):
+        """Add assistant's response to a chat session."""
+        session = self.get_chat_session(session_id, user_id)
+        if not session:
+            logger.warning(f"Attempted to add assistant response to non-existent session {session_id}")
+            return
+        
+        timestamp = datetime.now(UTC).isoformat()
+        session.add_message(
             role="assistant",
-            content=response,
-            timestamp=datetime.now(timezone.utc).isoformat()
+            content=content,
+            timestamp=timestamp
         )
         
+        # If there's an image, find the message we just added and append the key
+        if image_base64:
+            # The message is the last one in the list
+            if session.conversation_data and session.conversation_data.get("messages"):
+                session.conversation_data["messages"][-1]["image_base64"] = image_base64
+        
         self.db.commit()
-        return True
 
     def add_user_message(self, session_id: UUID, user_id: int, message: str) -> bool:
         """Add user message to existing chat session"""
@@ -77,7 +86,7 @@ class ChatService:
         chat_session.add_message(
             role="human",
             content=message,
-            timestamp=datetime.now(timezone.utc).isoformat()
+            timestamp=datetime.now(UTC).isoformat()
         )
         
         self.db.commit()
@@ -95,7 +104,7 @@ class ChatService:
         """Get user's chat sessions ordered by most recent"""
         return self.db.query(ChatHistory).filter(
             ChatHistory.user_id == user_id,
-            ChatHistory.expires_at > datetime.now(timezone.utc)
+            ChatHistory.expires_at > datetime.now(UTC)
         ).order_by(ChatHistory.updated_at.desc()).limit(limit).all()
 
     def delete_chat_session(self, session_id: UUID, user_id: int) -> bool:
@@ -160,7 +169,7 @@ class ChatService:
     def cleanup_expired_sessions(self) -> int:
         """Clean up expired chat sessions (run this as a background task)"""
         expired_sessions = self.db.query(ChatHistory).filter(
-            ChatHistory.expires_at < datetime.now(timezone.utc)
+            ChatHistory.expires_at < datetime.now(UTC)
         )
         
         count = expired_sessions.count()
