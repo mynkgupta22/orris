@@ -105,7 +105,7 @@ def get_folders_for_webhook_monitoring(drive_service, root_folder_id: str, inclu
 async def initialize_webhooks_if_needed():
     """Initialize webhooks if no active webhooks exist and environment variables are set"""
     from app.core.database import SessionLocal
-    from app.services.drive_service import get_drive_service  # Assume this exists
+    from app.rag.integrations.drive import get_drive_service  # Assume this exists
     
     db = SessionLocal()
     try:
@@ -281,7 +281,7 @@ async def ensure_webhook_initialized():
 async def refresh_webhook_folders():
     """Discover new subfolders and create webhooks for them if needed"""
     from app.core.database import SessionLocal
-    from app.services.drive_service import get_drive_service
+    from app.rag.integrations.drive import get_drive_service
     
     db = SessionLocal()
     try:
