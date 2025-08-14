@@ -16,7 +16,6 @@ router = APIRouter()
 
 @router.post("/google-drive")
 async def google_drive_webhook(
-    logger.info("Received Google Drive webhook request")
     request: Request,
     background_tasks: BackgroundTasks,
     x_goog_channel_id: Optional[str] = Header(None),
@@ -26,6 +25,8 @@ async def google_drive_webhook(
     x_goog_message_number: Optional[str] = Header(None),
     x_goog_changed: Optional[str] = Header(None),
 ):
+    logger.info("Received Google Drive webhook request")
+
     """
     Webhook endpoint for Google Drive push notifications.
     
