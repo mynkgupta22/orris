@@ -6,6 +6,7 @@ from pathlib import Path
 from datetime import datetime
 import io
 import os
+import json
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -27,23 +28,57 @@ class DriveFile:
 
 
 def get_drive_service() -> any:
-    """Create a Google Drive API client using a service account file.
+    """Create a Google Drive API client using service account credentials.
 
+    Supports two modes:
+    1. Local Development: Load from service account JSON file
+    2. Production: Load from environment variable containing JSON data
+    
     Environment variables:
-      - GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_FILE: path to JSON
+      - GOOGLE_SERVICE_ACCOUNT_JSON: JSON string containing service account data (production)
+      - GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_FILE: path to JSON file (local)
       - GOOGLE_DRIVE_SCOPES (optional, comma-separated)
     """
-    cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv(
-        "GOOGLE_SERVICE_ACCOUNT_FILE"
-    )
+    import json
+    
+    # Check for JSON data in environment variable first (production mode)
+    service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    
+    if service_account_json:
+        # Production mode: load from environment variable
+        try:
+            service_account_info = json.loads(service_account_json)
+            scopes_env = os.getenv("GOOGLE_DRIVE_SCOPES")
+            scopes = [s.strip() for s in scopes_env.split(",")] if scopes_env else DEFAULT_SCOPES
+            creds = service_account.Credentials.from_service_account_info(service_account_info, scopes=scopes)
+            return build("drive", "v3", credentials=creds, cache_discovery=False)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Invalid JSON in GOOGLE_SERVICE_ACCOUNT_JSON environment variable: {e}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create credentials from GOOGLE_SERVICE_ACCOUNT_JSON: {e}")
+    
+    # Local development mode: load from file
+    cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")
+    
     if not cred_path:
-        raise RuntimeError(
-            "Set GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_FILE to your service account JSON."
-        )
-    scopes_env = os.getenv("GOOGLE_DRIVE_SCOPES")
-    scopes = [s.strip() for s in scopes_env.split(",")] if scopes_env else DEFAULT_SCOPES
-    creds = service_account.Credentials.from_service_account_file(cred_path, scopes=scopes)
-    return build("drive", "v3", credentials=creds, cache_discovery=False)
+        # Try default local paths
+        from app.core.paths import SERVICE_ACCOUNT_PATH
+        if SERVICE_ACCOUNT_PATH.exists():
+            cred_path = str(SERVICE_ACCOUNT_PATH)
+        else:
+            raise RuntimeError(
+                "Google Drive credentials not found. For production, set GOOGLE_SERVICE_ACCOUNT_JSON. "
+                "For local development, set GOOGLE_APPLICATION_CREDENTIALS, GOOGLE_SERVICE_ACCOUNT_FILE, "
+                f"or place service-account.json at {SERVICE_ACCOUNT_PATH}"
+            )
+    
+    try:
+        scopes_env = os.getenv("GOOGLE_DRIVE_SCOPES")
+        scopes = [s.strip() for s in scopes_env.split(",")] if scopes_env else DEFAULT_SCOPES
+        creds = service_account.Credentials.from_service_account_file(cred_path, scopes=scopes)
+        return build("drive", "v3", credentials=creds, cache_discovery=False)
+    except Exception as e:
+        raise RuntimeError(f"Failed to create credentials from file {cred_path}: {e}")
 
 
 def _list_children(service, folder_id: str) -> List[dict]:

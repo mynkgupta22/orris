@@ -25,33 +25,42 @@ logger = logging.getLogger(__name__)
 
 def _get_folder_id_from_channel(channel_id: Optional[str]) -> Optional[str]:
     """
-    Look up the folder ID from channel ID using webhook_channels.json
+    Look up the folder ID from channel ID using database
     """
     if not channel_id:
         return None
         
     try:
-        from app.core.paths import WEBHOOK_CHANNELS_PATH
-        channels_file = WEBHOOK_CHANNELS_PATH
-        if not channels_file.exists():
-            logger.warning("webhook_channels.json file not found")
+        from app.services.webhook_channel_service import WebhookChannelService
+        from app.core.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            # First try exact match
+            channel = WebhookChannelService.get_webhook_channel(db, channel_id)
+            if channel and channel.status == 'active':
+                return channel.folder_id
+            
+            # If exact match not found, try to find a channel with similar base ID
+            # Extract base channel ID (remove the suffix after last dash)
+            if '-' in channel_id:
+                base_channel_id = '-'.join(channel_id.split('-')[:-1])
+                active_channels = WebhookChannelService.get_active_webhook_channels(db)
+                
+                for channel in active_channels:
+                    if channel.channel_id.startswith(base_channel_id):
+                        logger.info(f"Found similar channel ID: {channel.channel_id} for requested {channel_id}")
+                        return channel.folder_id
+            
+            logger.warning(f"No folder found for channel ID: {channel_id}")
             return None
             
-        with open(channels_file, 'r') as f:
-            channels = json.load(f)
+        finally:
+            db.close()
             
-        for channel in channels:
-            if channel.get('channel_id') == channel_id and channel.get('status') == 'active':
-                return channel.get('folder_id')
-                
-        # If exact match not found, try to find a channel with similar base ID
-        # Extract base channel ID (remove the suffix after last dash)
-        if '-' in channel_id:
-            base_channel_id = '-'.join(channel_id.split('-')[:-1])
-            for channel in channels:
-                if channel.get('channel_id', '').startswith(base_channel_id) and channel.get('status') == 'active':
-                    logger.info(f"Found folder ID via base channel match: {base_channel_id}")
-                    return channel.get('folder_id')
+    except Exception as e:
+        logger.error(f"Error looking up folder ID for channel {channel_id}: {e}")
+        return None
         
         # Final fallback: if channel ID follows our naming pattern, extract folder ID
         if channel_id and channel_id.startswith('orris-sync-'):
