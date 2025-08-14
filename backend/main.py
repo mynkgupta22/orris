@@ -27,7 +27,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.get_allowed_origins(),
+    allow_origins=['https://orris-4vg9.vercel.app'],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
