@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     
     # Database
-    database_url: str = "postgresql://postgres:root@localhost:5432/orris1"
+    database_url: str = "postgresql://postgres:root@localhost:5432/orris1,https://orris-4vg9-mynkgupta22s-projects.vercel.app"
     
     # JWT
     jwt_secret_key: str = "default-secret-key"
