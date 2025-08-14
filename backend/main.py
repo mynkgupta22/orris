@@ -9,6 +9,8 @@ import os
 import certifi
 import logging
 
+logger = logging.getLogger(__name__)
+
 # Configure SSL certificates before any HTTP requests
 os.environ['SSL_CERT_FILE'] = certifi.where()
 os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
