@@ -74,10 +74,10 @@ class Settings(BaseSettings):
             expanded_origins = []
             for origin in origins:
                 expanded_origins.append(origin)
-                if origin.endswith('/'):
-                    expanded_origins.append(origin.rstrip('/'))
-                else:
-                    expanded_origins.append(origin + '/')
+                # if origin.endswith('/'):
+                #     expanded_origins.append(origin.rstrip('/'))
+                # else:
+                #     expanded_origins.append(origin + '/')
             return expanded_origins
         return ["http://192.168.0.87:3000", "http://localhost:8080","https://orris-4vg9.vercel.app","https://orris-4vg9-21sjup5fk-mynkgupta22s-projects.vercel.app"]
 
