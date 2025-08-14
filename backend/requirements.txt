@@ -41,6 +41,7 @@ psycopg2-binary==2.9.10
 PyMuPDF
 qdrant_client==1.15.1
 railroad==0.5.0
+replicate
 simplejson==3.20.1
 SQLAlchemy==2.0.43
 tiktoken==0.10.0

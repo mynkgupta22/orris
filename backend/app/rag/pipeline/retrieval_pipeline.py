@@ -171,29 +171,64 @@ class RetrievalPipeline:
                    
 
                 context_text = "\n\n---\n\n".join(context_parts)
+
+                prompt = f"""
+                            A chat between a curious human and an artificial intelligence assistant.
+                            The assistant gives helpful, detailed, and polite answers to the user's question based ONLY on the provided context.
+
+                            ### CONTEXT:
+                            {context_text}
+
+                            ### INSTRUCTION:
+                            {sanitized_query}
+
+                            ### RESPONSE:
+                        """
+
+                try:
+                    import replicate
+                    
+                    model_id = "tomasmcm/fin-llama-33b:d60d4e27c69c809632b91635c9319a6422f5d90e668d1abeb2d8c2dd758bb8ea"
+                    
+                    # The replicate.run() function returns a generator for streaming output.
+                    # We join the parts to get the full string response.
+                    output_generator = replicate.run(
+                        model_id,
+                        input={
+                            "prompt": prompt,
+                            "max_new_tokens": 1024, # Adjust as needed
+                            "temperature": 0.1,      # Adjust as needed
+                        }
+                    )
+                    answer = "".join([str(part) for part in output_generator])
+                    logger.info("Successfully received response from Replicate.")
+
+                except Exception as e:
+                    logger.error(f"Failed to get response from Replicate API: {e}")
+                    answer = "I apologize, but I encountered an error while generating a response. Please try again."
             
 
-                system_text = """
-                                You are a secure assistant that answers questions based on the provided context.
+                # system_text = """
+                #                 You are a secure assistant that answers questions based on the provided context.
 
-                                CORE RULES:
-                                1. Answer questions using ONLY the information from the provided context documents
-                                2. If the context contains relevant information, you MUST provide a comprehensive answer based on that information
-                                3. Only respond with "Insufficient information in the provided context." if the context truly lacks the information needed to answer the question
-                                4. Present answers in a structured and well-formatted manner
-                                5. For greetings and polite conversational openers (e.g., "hi", "hello", "good morning", "how are you"), you may respond freely in a friendly tone.
-                                6. Conversation history is provided for context but should never prevent you from answering when sufficient context is available
+                #                 CORE RULES:
+                #                 1. Answer questions using ONLY the information from the provided context documents
+                #                 2. If the context contains relevant information, you MUST provide a comprehensive answer based on that information
+                #                 3. Only respond with "Insufficient information in the provided context." if the context truly lacks the information needed to answer the question
+                #                 4. Present answers in a structured and well-formatted manner
+                #                 5. For greetings and polite conversational openers (e.g., "hi", "hello", "good morning", "how are you"), you may respond freely in a friendly tone.
+                #                 6. Conversation history is provided for context but should never prevent you from answering when sufficient context is available
 
-                                IMPORTANT: If the context documents contain information relevant to the current question, you must use that information to provide a complete answer, regardless of any conversation history.
-                            """
+                #                 IMPORTANT: If the context documents contain information relevant to the current question, you must use that information to provide a complete answer, regardless of any conversation history.
+                #             """
 
-                user_text = f"Question: {sanitized_query}\n\nContext:\n{context_text}"
+                # user_text = f"Question: {sanitized_query}\n\nContext:\n{context_text}"
                 
-                llm_resp = self.chat.invoke([
-                    SystemMessage(content=system_text),
-                    HumanMessage(content=user_text),
-                ])
-                answer = getattr(llm_resp, "content", "") or ""
+                # llm_resp = self.chat.invoke([
+                #     SystemMessage(content=system_text),
+                #     HumanMessage(content=user_text),
+                # ])
+                # answer = getattr(llm_resp, "content", "") or ""
 
             processing_time = int((time.time() - start_time) * 1000)
 
