@@ -4,7 +4,13 @@ from typing import Optional
 from datetime import datetime, UTC
 from pathlib import Path
 import asyncio
+import certifi
 from googleapiclient.errors import HttpError
+
+# Configure SSL certificates for Google API calls
+os.environ['SSL_CERT_FILE'] = certifi.where()
+os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+os.environ['CURL_CA_BUNDLE'] = certifi.where()
 
 from app.rag.integrations.drive import get_drive_service, resolve_type_from_mime, classify_from_path, download_file
 from app.rag.storage.sync_tracker import track_document_sync, mark_document_synced, mark_document_failed, document_needs_resync
@@ -25,33 +31,42 @@ logger = logging.getLogger(__name__)
 
 def _get_folder_id_from_channel(channel_id: Optional[str]) -> Optional[str]:
     """
-    Look up the folder ID from channel ID using webhook_channels.json
+    Look up the folder ID from channel ID using database
     """
     if not channel_id:
         return None
         
     try:
-        from app.core.paths import WEBHOOK_CHANNELS_PATH
-        channels_file = WEBHOOK_CHANNELS_PATH
-        if not channels_file.exists():
-            logger.warning("webhook_channels.json file not found")
+        from app.services.webhook_channel_service import WebhookChannelService
+        from app.core.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            # First try exact match
+            channel = WebhookChannelService.get_webhook_channel(db, channel_id)
+            if channel and channel.status == 'active':
+                return channel.folder_id
+            
+            # If exact match not found, try to find a channel with similar base ID
+            # Extract base channel ID (remove the suffix after last dash)
+            if '-' in channel_id:
+                base_channel_id = '-'.join(channel_id.split('-')[:-1])
+                active_channels = WebhookChannelService.get_active_webhook_channels(db)
+                
+                for channel in active_channels:
+                    if channel.channel_id.startswith(base_channel_id):
+                        logger.info(f"Found similar channel ID: {channel.channel_id} for requested {channel_id}")
+                        return channel.folder_id
+            
+            logger.warning(f"No folder found for channel ID: {channel_id}")
             return None
             
-        with open(channels_file, 'r') as f:
-            channels = json.load(f)
+        finally:
+            db.close()
             
-        for channel in channels:
-            if channel.get('channel_id') == channel_id and channel.get('status') == 'active':
-                return channel.get('folder_id')
-                
-        # If exact match not found, try to find a channel with similar base ID
-        # Extract base channel ID (remove the suffix after last dash)
-        if '-' in channel_id:
-            base_channel_id = '-'.join(channel_id.split('-')[:-1])
-            for channel in channels:
-                if channel.get('channel_id', '').startswith(base_channel_id) and channel.get('status') == 'active':
-                    logger.info(f"Found folder ID via base channel match: {base_channel_id}")
-                    return channel.get('folder_id')
+    except Exception as e:
+        logger.error(f"Error looking up folder ID for channel {channel_id}: {e}")
+        return None
         
         # Final fallback: if channel ID follows our naming pattern, extract folder ID
         if channel_id and channel_id.startswith('orris-sync-'):
@@ -315,9 +330,17 @@ async def _process_single_document(service, file_metadata):
             return
         
         # Delete existing chunks first (for updates)
-        deleted_count = delete_document_chunks(file_id)
-        if deleted_count > 0:
-            logger.info(f"Deleted {deleted_count} existing chunks for {file_name}")
+        try:
+            deleted_count = delete_document_chunks(file_id)
+            if deleted_count > 0:
+                logger.info(f"Deleted {deleted_count} existing chunks for {file_name}")
+        except ConnectionError as e:
+            logger.error(f"Failed to connect to vector database for deletion: {e}")
+            mark_document_failed(file_id, f"Vector database connection failed: {str(e)}")
+            return
+        except Exception as e:
+            logger.error(f"Failed to delete existing chunks for {file_name}: {e}")
+            # Continue processing even if deletion fails
         
         # Download file to temporary location
         tmp_dir = Path(os.getenv("INGEST_TMP_DIR", ".ingest_tmp"))
@@ -368,11 +391,20 @@ async def _process_single_document(service, file_metadata):
             chunks = chunk_elements(elements)
             
             if chunks:
-                written = upsert_document_chunks(chunks)
-                logger.info(f"Processed {file_name}: {len(elements)} elements, {len(chunks)} chunks, {written} indexed")
-                
-                # Mark as successfully synced
-                mark_document_synced(file_id)
+                try:
+                    written = upsert_document_chunks(chunks)
+                    logger.info(f"Processed {file_name}: {len(elements)} elements, {len(chunks)} chunks, {written} indexed")
+                    
+                    # Mark as successfully synced
+                    mark_document_synced(file_id)
+                except ConnectionError as e:
+                    logger.error(f"Failed to connect to vector database for upsert: {e}")
+                    mark_document_failed(file_id, f"Vector database connection failed: {str(e)}")
+                    return
+                except Exception as e:
+                    logger.error(f"Failed to upsert chunks for {file_name}: {e}")
+                    mark_document_failed(file_id, f"Vector database upsert failed: {str(e)}")
+                    return
             else:
                 logger.warning(f"No chunks generated for {file_name}")
                 mark_document_failed(file_id, "No chunks generated")
@@ -497,29 +529,47 @@ def setup_drive_webhook(webhook_url: str, folder_id: str) -> dict:
     Returns:
         Channel information from Google
     """
-    service = get_drive_service()
-    
-    # Channel configuration with unique ID
-    import uuid
-    unique_suffix = str(uuid.uuid4())[:8]
-    channel_body = {
-        'id': f'orris-sync-{folder_id}-{unique_suffix}',
-        'type': 'web_hook',
-        'address': webhook_url,
-        'payload': True,
-        'token': os.getenv("GOOGLE_WEBHOOK_TOKEN", "orris-webhook-token")
-    }
+    logger.info(f"Setting up webhook for folder {folder_id} with URL {webhook_url}")
     
     try:
+        service = get_drive_service()
+        logger.info("Google Drive service obtained successfully")
+        
+        # Verify folder exists and is accessible
+        try:
+            folder_info = service.files().get(fileId=folder_id, fields="id,name,mimeType").execute()
+            logger.info(f"Target folder verified: {folder_info.get('name')} ({folder_info.get('id')})")
+        except Exception as folder_error:
+            logger.error(f"Cannot access folder {folder_id}: {folder_error}")
+            raise RuntimeError(f"Folder {folder_id} not accessible: {folder_error}")
+        
+        # Channel configuration with unique ID
+        import uuid
+        unique_suffix = str(uuid.uuid4())[:8]
+        channel_id = f'orris-sync-{folder_id}-{unique_suffix}'
+        
+        channel_body = {
+            'id': channel_id,
+            'type': 'web_hook',
+            'address': webhook_url,
+            'payload': True,
+            'token': os.getenv("GOOGLE_WEBHOOK_TOKEN", "orris-webhook-token")
+        }
+        
+        logger.info(f"Setting up webhook channel: {channel_id}")
+        logger.info(f"Webhook payload: {channel_body}")
+        
         # Watch the folder for changes
         response = service.files().watch(
             fileId=folder_id,
             body=channel_body
         ).execute()
         
-        logger.info(f"Set up webhook for folder {folder_id}: {response}")
+        logger.info(f"✅ Webhook setup successful! Response: {response}")
         return response
         
     except Exception as e:
+        import traceback
         logger.error(f"Failed to set up webhook: {e}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise

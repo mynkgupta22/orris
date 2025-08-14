@@ -4,7 +4,15 @@ import asyncio
 from app.core.config import settings
 from app.routers import auth, users, webhooks
 from app.rag.api.retriever_router import router as rag_router
-from app.services.webhook_renewal import run_webhook_renewal_service
+from app.services.webhook_renewal import run_webhook_renewal_service, ensure_webhook_initialized, migrate_json_to_database
+import os
+import certifi
+import logging
+
+# Configure SSL certificates before any HTTP requests
+os.environ['SSL_CERT_FILE'] = certifi.where()
+os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+os.environ['CURL_CA_BUNDLE'] = certifi.where()
 
 app = FastAPI(
     title="Orris Authentication API",
@@ -16,7 +24,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.get_allowed_origins(),
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,9 +45,19 @@ async def health_check():
 
 @app.on_event("startup")
 async def startup_event():
+    """Initialize webhooks if needed (this will create them in database)"""
+    try:
+        webhook_initialized = await ensure_webhook_initialized()
+        if webhook_initialized:
+            logger.info("Webhook initialization completed during startup")
+        else:
+            logger.info("Webhook initialization skipped (missing env vars) or failed")
+    except Exception as e:
+        logger.error(f"Error during webhook initialization: {e}")
+
     # Start the webhook renewal service in the background
     asyncio.create_task(run_webhook_renewal_service())
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8001)
