@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     gdrive_root_id: str = ""
     
     # CORS
-    allowed_origins: str = "http://192.168.0.87:3000,http://localhost:8080,http://192.168.0.93:8001,http://localhost:8001,https://orris-4vg9.vercel.app,https://orris-4vg9-21sjup5fk-mynkgupta22s-projects.vercel.app,http://localhost:3000,http://localhost:3001,https://orris-a3qw.onrender.com"
+    allowed_origins: str = "http://192.168.0.87:3000,http://localhost:8080,http://192.168.0.93:8001,http://localhost:3000,https://orris-backend.onrender.com"
     
     # Rate Limiting
     rate_limit_per_minute: int = 60 
