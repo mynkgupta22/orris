@@ -4,7 +4,13 @@ from typing import Optional
 from datetime import datetime, UTC
 from pathlib import Path
 import asyncio
+import certifi
 from googleapiclient.errors import HttpError
+
+# Configure SSL certificates for Google API calls
+os.environ['SSL_CERT_FILE'] = certifi.where()
+os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+os.environ['CURL_CA_BUNDLE'] = certifi.where()
 
 from app.rag.integrations.drive import get_drive_service, resolve_type_from_mime, classify_from_path, download_file
 from app.rag.storage.sync_tracker import track_document_sync, mark_document_synced, mark_document_failed, document_needs_resync

@@ -7,6 +7,13 @@ from datetime import datetime
 import io
 import os
 import json
+import certifi
+import httplib2
+
+# Configure SSL certificates for Google API calls
+os.environ['SSL_CERT_FILE'] = certifi.where()
+os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+os.environ['CURL_CA_BUNDLE'] = certifi.where()
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -47,7 +54,6 @@ def get_drive_service() -> any:
     # Check for JSON data in environment variable first (production mode)
     # Support multiple environment variable names for flexibility
     service_account_json = (
-        os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON") or 
         os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
     )
     
@@ -60,7 +66,10 @@ def get_drive_service() -> any:
             scopes = [s.strip() for s in scopes_env.split(",")] if scopes_env else DEFAULT_SCOPES
             creds = service_account.Credentials.from_service_account_info(service_account_info, scopes=scopes)
             logger.info("Successfully created Google Drive service from environment credentials")
-            return build("drive", "v3", credentials=creds, cache_discovery=False)
+            
+            # Create httplib2 instance with proper CA certificates
+            http = httplib2.Http(ca_certs=certifi.where())
+            return build("drive", "v3", credentials=creds, cache_discovery=False, http=http)
         except json.JSONDecodeError as e:
             raise RuntimeError(f"Invalid JSON in GOOGLE_SERVICE_ACCOUNT_JSON/GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable: {e}")
         except Exception as e:
@@ -95,7 +104,10 @@ def get_drive_service() -> any:
         scopes = [s.strip() for s in scopes_env.split(",")] if scopes_env else DEFAULT_SCOPES
         creds = service_account.Credentials.from_service_account_file(cred_path, scopes=scopes)
         logger.info("Successfully created Google Drive service from file credentials")
-        return build("drive", "v3", credentials=creds, cache_discovery=False)
+        
+        # Create httplib2 instance with proper CA certificates
+        http = httplib2.Http(ca_certs=certifi.where())
+        return build("drive", "v3", credentials=creds, cache_discovery=False, http=http)
     except Exception as e:
         raise RuntimeError(f"Failed to create credentials from file {cred_path}: {e}")
 
