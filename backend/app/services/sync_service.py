@@ -506,29 +506,47 @@ def setup_drive_webhook(webhook_url: str, folder_id: str) -> dict:
     Returns:
         Channel information from Google
     """
-    service = get_drive_service()
-    
-    # Channel configuration with unique ID
-    import uuid
-    unique_suffix = str(uuid.uuid4())[:8]
-    channel_body = {
-        'id': f'orris-sync-{folder_id}-{unique_suffix}',
-        'type': 'web_hook',
-        'address': webhook_url,
-        'payload': True,
-        'token': os.getenv("GOOGLE_WEBHOOK_TOKEN", "orris-webhook-token")
-    }
+    logger.info(f"Setting up webhook for folder {folder_id} with URL {webhook_url}")
     
     try:
+        service = get_drive_service()
+        logger.info("Google Drive service obtained successfully")
+        
+        # Verify folder exists and is accessible
+        try:
+            folder_info = service.files().get(fileId=folder_id, fields="id,name,mimeType").execute()
+            logger.info(f"Target folder verified: {folder_info.get('name')} ({folder_info.get('id')})")
+        except Exception as folder_error:
+            logger.error(f"Cannot access folder {folder_id}: {folder_error}")
+            raise RuntimeError(f"Folder {folder_id} not accessible: {folder_error}")
+        
+        # Channel configuration with unique ID
+        import uuid
+        unique_suffix = str(uuid.uuid4())[:8]
+        channel_id = f'orris-sync-{folder_id}-{unique_suffix}'
+        
+        channel_body = {
+            'id': channel_id,
+            'type': 'web_hook',
+            'address': webhook_url,
+            'payload': True,
+            'token': os.getenv("GOOGLE_WEBHOOK_TOKEN", "orris-webhook-token")
+        }
+        
+        logger.info(f"Setting up webhook channel: {channel_id}")
+        logger.info(f"Webhook payload: {channel_body}")
+        
         # Watch the folder for changes
         response = service.files().watch(
             fileId=folder_id,
             body=channel_body
         ).execute()
         
-        logger.info(f"Set up webhook for folder {folder_id}: {response}")
+        logger.info(f"✅ Webhook setup successful! Response: {response}")
         return response
         
     except Exception as e:
+        import traceback
         logger.error(f"Failed to set up webhook: {e}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise
