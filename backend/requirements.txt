@@ -10,7 +10,6 @@ cryptography==45.0.6
 certifi
 email-validator==2.1.1
 fastapi==0.116.1
-fitz==0.0.1.dev2
 grpcio_status==1.74.0
 google-auth==2.35.0
 google-auth-oauthlib
@@ -39,6 +38,7 @@ python-dotenv==1.1.1
 python_jose==3.3.0
 pyu2f==0.1.5
 psycopg2-binary==2.9.10
+PyMuPDF
 qdrant_client==1.15.1
 railroad==0.5.0
 simplejson==3.20.1
