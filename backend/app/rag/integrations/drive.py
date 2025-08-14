@@ -15,6 +15,28 @@ os.environ['SSL_CERT_FILE'] = certifi.where()
 os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
 os.environ['CURL_CA_BUNDLE'] = certifi.where()
 
+# Patch httplib2 to use certifi by default
+def patch_httplib2_ssl():
+    """Patch httplib2 to use certifi certificates by default"""
+    original_init = httplib2.Http.__init__
+    
+    def patched_init(self, cache=None, timeout=None, proxy_info=None, ca_certs=None, 
+                     disable_ssl_certificate_validation=False, tls_maximum_version=None, 
+                     tls_minimum_version=None):
+        # If no ca_certs specified, use certifi
+        if ca_certs is None:
+            ca_certs = certifi.where()
+        return original_init(self, cache=cache, timeout=timeout, proxy_info=proxy_info,
+                           ca_certs=ca_certs, 
+                           disable_ssl_certificate_validation=disable_ssl_certificate_validation,
+                           tls_maximum_version=tls_maximum_version, 
+                           tls_minimum_version=tls_minimum_version)
+    
+    httplib2.Http.__init__ = patched_init
+
+# Apply the patch
+patch_httplib2_ssl()
+
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -67,9 +89,8 @@ def get_drive_service() -> any:
             creds = service_account.Credentials.from_service_account_info(service_account_info, scopes=scopes)
             logger.info("Successfully created Google Drive service from environment credentials")
             
-            # Create httplib2 instance with proper CA certificates
-            http = httplib2.Http(ca_certs=certifi.where())
-            return build("drive", "v3", credentials=creds, cache_discovery=False, http=http)
+            # Use credentials with proper SSL configuration via environment variables
+            return build("drive", "v3", credentials=creds, cache_discovery=False)
         except json.JSONDecodeError as e:
             raise RuntimeError(f"Invalid JSON in GOOGLE_SERVICE_ACCOUNT_JSON/GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable: {e}")
         except Exception as e:
@@ -105,9 +126,8 @@ def get_drive_service() -> any:
         creds = service_account.Credentials.from_service_account_file(cred_path, scopes=scopes)
         logger.info("Successfully created Google Drive service from file credentials")
         
-        # Create httplib2 instance with proper CA certificates
-        http = httplib2.Http(ca_certs=certifi.where())
-        return build("drive", "v3", credentials=creds, cache_discovery=False, http=http)
+        # Use credentials with proper SSL configuration via environment variables
+        return build("drive", "v3", credentials=creds, cache_discovery=False)
     except Exception as e:
         raise RuntimeError(f"Failed to create credentials from file {cred_path}: {e}")
 
