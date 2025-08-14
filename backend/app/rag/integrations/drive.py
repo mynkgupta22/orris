@@ -35,29 +35,39 @@ def get_drive_service() -> any:
     2. Production: Load from environment variable containing JSON data
     
     Environment variables:
-      - GOOGLE_SERVICE_ACCOUNT_JSON: JSON string containing service account data (production)
+      - GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS_JSON: JSON string containing service account data (production)
       - GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_FILE: path to JSON file (local)
       - GOOGLE_DRIVE_SCOPES (optional, comma-separated)
     """
     import json
+    import logging
+    
+    logger = logging.getLogger(__name__)
     
     # Check for JSON data in environment variable first (production mode)
-    service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    # Support multiple environment variable names for flexibility
+    service_account_json = (
+        os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON") or 
+        os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+    )
     
     if service_account_json:
         # Production mode: load from environment variable
         try:
+            logger.info("Loading Google Drive credentials from environment variable")
             service_account_info = json.loads(service_account_json)
             scopes_env = os.getenv("GOOGLE_DRIVE_SCOPES")
             scopes = [s.strip() for s in scopes_env.split(",")] if scopes_env else DEFAULT_SCOPES
             creds = service_account.Credentials.from_service_account_info(service_account_info, scopes=scopes)
+            logger.info("Successfully created Google Drive service from environment credentials")
             return build("drive", "v3", credentials=creds, cache_discovery=False)
         except json.JSONDecodeError as e:
-            raise RuntimeError(f"Invalid JSON in GOOGLE_SERVICE_ACCOUNT_JSON environment variable: {e}")
+            raise RuntimeError(f"Invalid JSON in GOOGLE_SERVICE_ACCOUNT_JSON/GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable: {e}")
         except Exception as e:
-            raise RuntimeError(f"Failed to create credentials from GOOGLE_SERVICE_ACCOUNT_JSON: {e}")
+            raise RuntimeError(f"Failed to create credentials from environment variable: {e}")
     
     # Local development mode: load from file
+    logger.info("No environment credentials found, trying file-based credentials")
     cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")
     
     if not cred_path:
@@ -65,17 +75,26 @@ def get_drive_service() -> any:
         from app.core.paths import SERVICE_ACCOUNT_PATH
         if SERVICE_ACCOUNT_PATH.exists():
             cred_path = str(SERVICE_ACCOUNT_PATH)
+            logger.info(f"Using default service account file: {cred_path}")
         else:
+            available_env_vars = [
+                "GOOGLE_SERVICE_ACCOUNT_JSON", 
+                "GOOGLE_APPLICATION_CREDENTIALS_JSON",
+                "GOOGLE_APPLICATION_CREDENTIALS", 
+                "GOOGLE_SERVICE_ACCOUNT_FILE"
+            ]
             raise RuntimeError(
-                "Google Drive credentials not found. For production, set GOOGLE_SERVICE_ACCOUNT_JSON. "
-                "For local development, set GOOGLE_APPLICATION_CREDENTIALS, GOOGLE_SERVICE_ACCOUNT_FILE, "
+                f"Google Drive credentials not found. For production, set one of: {available_env_vars[:2]}. "
+                f"For local development, set one of: {available_env_vars[2:]} "
                 f"or place service-account.json at {SERVICE_ACCOUNT_PATH}"
             )
     
     try:
+        logger.info(f"Loading Google Drive credentials from file: {cred_path}")
         scopes_env = os.getenv("GOOGLE_DRIVE_SCOPES")
         scopes = [s.strip() for s in scopes_env.split(",")] if scopes_env else DEFAULT_SCOPES
         creds = service_account.Credentials.from_service_account_file(cred_path, scopes=scopes)
+        logger.info("Successfully created Google Drive service from file credentials")
         return build("drive", "v3", credentials=creds, cache_discovery=False)
     except Exception as e:
         raise RuntimeError(f"Failed to create credentials from file {cred_path}: {e}")
