@@ -59,6 +59,7 @@ def load_pdf(
     base_meta: Dict[str, Any],
     *,
     summarize_image_fn: Optional[Callable[[str], str]] = None,
+    summarize_image_with_base64_fn: Optional[Callable[[str], tuple[str, str]]] = None,
     image_lookup: Optional[Callable[[int], List[str]]] = None,
 ) -> List[Dict[str, Any]]:
     try:
@@ -87,10 +88,25 @@ def load_pdf(
         text = getattr(el, "text", "") or ""
         is_table = category == "Table"
         is_image = category in {"Image", "Figure"}
+        
+        # Initialize image_base64 outside the image processing block
+        image_base64: Optional[str] = None
 
         if is_image:
             summary: Optional[str] = None
-            if summarize_image_fn is not None:
+            
+            if summarize_image_with_base64_fn is not None:
+                try:
+                    # Prefer extracted image if available for this page
+                    img_paths = image_lookup(page_number) if (image_lookup and page_number) else []
+                    target_img = img_paths[0] if img_paths else path
+                    summary, image_base64 = summarize_image_with_base64_fn(target_img)
+                    print(f"[DEBUG] Generated base64 for image: {len(image_base64) if image_base64 else 0} chars")
+                except Exception as e:
+                    print(f"[DEBUG] Failed to generate base64: {e}")
+                    summary = None
+                    image_base64 = None
+            elif summarize_image_fn is not None:
                 try:
                     # Prefer extracted image if available for this page
                     img_paths = image_lookup(page_number) if (image_lookup and page_number) else []
@@ -122,6 +138,12 @@ def load_pdf(
                 img_paths = image_lookup(page_number)
                 if img_paths:
                     meta_with_summary["image_url"] = img_paths[0]
+            # Store base64 encoding if available
+            if image_base64:
+                meta_with_summary["image_base64"] = image_base64
+                print(f"[DEBUG] Added image_base64 to metadata: {len(image_base64)} chars")
+            else:
+                print("[DEBUG] No image_base64 to add to metadata")
             elem["meta"] = meta_with_summary
         normalized.append(elem)
     return normalized
@@ -228,15 +250,27 @@ def load_image(
     base_meta: Dict[str, Any],
     *,
     summarize_image_fn: Optional[Callable[[str], str]] = None,
+    summarize_image_with_base64_fn: Optional[Callable[[str], tuple[str, str]]] = None,
 ) -> List[Dict[str, Any]]:
     # Summarize via callback if provided; otherwise placeholder text
     name = base_meta.get("source_doc_name", Path(path).name)
     summary: Optional[str] = None
-    if summarize_image_fn is not None:
+    image_base64: Optional[str] = None
+    
+    if summarize_image_with_base64_fn is not None:
+        try:
+            summary, image_base64 = summarize_image_with_base64_fn(path)
+            print(f"[DEBUG] Generated base64 for standalone image: {len(image_base64) if image_base64 else 0} chars")
+        except Exception as e:
+            print(f"[DEBUG] Failed to generate base64 for standalone image: {e}")
+            summary = None
+            image_base64 = None
+    elif summarize_image_fn is not None:
         try:
             summary = summarize_image_fn(path)
         except Exception:
             summary = None
+            
     text = summary if (summary and summary.strip()) else f"Image: {name}"
     elem = _normalize_element(
         text=text,
@@ -248,6 +282,12 @@ def load_image(
     meta_with_summary = dict(elem["meta"])  # shallow copy
     meta_with_summary["image_summary"] = text
     meta_with_summary["image_url"] = str(Path(path))
+    # Store base64 encoding if available
+    if image_base64:
+        meta_with_summary["image_base64"] = image_base64
+        print(f"[DEBUG] Added image_base64 to standalone image metadata: {len(image_base64)} chars")
+    else:
+        print("[DEBUG] No image_base64 to add to standalone image metadata")
     elem["meta"] = meta_with_summary
     return [elem]
 
@@ -257,6 +297,7 @@ def load_file_to_elements(
     base_meta: Dict[str, Any],
     *,
     summarize_image_fn: Optional[Callable[[str], str]] = None,
+    summarize_image_with_base64_fn: Optional[Callable[[str], tuple[str, str]]] = None,
     image_lookup: Optional[Callable[[int], List[str]]] = None,
 ) -> List[Dict[str, Any]]:
     """Route a file to the proper loader and return normalized elements.
@@ -268,7 +309,7 @@ def load_file_to_elements(
 
     dtype = detect_type(path)
     if dtype == "pdf":
-        return load_pdf(path, base_meta, summarize_image_fn=summarize_image_fn, image_lookup=image_lookup)
+        return load_pdf(path, base_meta, summarize_image_fn=summarize_image_fn, summarize_image_with_base64_fn=summarize_image_with_base64_fn, image_lookup=image_lookup)
     if dtype == "docx":
         return load_docx(path, base_meta)
     if dtype == "txt":
@@ -276,7 +317,7 @@ def load_file_to_elements(
     if dtype == "xlsx":
         return load_xlsx(path, base_meta)
     if dtype == "image":
-        return load_image(path, base_meta, summarize_image_fn=summarize_image_fn)
+        return load_image(path, base_meta, summarize_image_fn=summarize_image_fn, summarize_image_with_base64_fn=summarize_image_with_base64_fn)
     raise ValueError(f"Unsupported detected type: {dtype}")
 
 

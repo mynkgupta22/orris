@@ -21,11 +21,12 @@ from app.rag.core.extractors import extract_pdf_images, extract_docx_images
 from app.rag.storage.sync_tracker import track_document_sync, mark_document_synced, mark_document_failed, document_needs_resync
 
 try:
-    from app.rag.integrations.vision import summarize_image_llava
+    from app.rag.integrations.vision import summarize_image_llava, summarize_image_with_base64
     print("[INFO] Successfully imported LLaVA vision module")
 except Exception as e:
     print(f"[WARN] Failed to import LLaVA vision module: {e}")
     summarize_image_llava = None  # type: ignore
+    summarize_image_with_base64 = None  # type: ignore
 
 
 def build_base_meta(path: Path, *, is_pi: bool = False, uid: str | None = None) -> Dict[str, Any]:
@@ -74,7 +75,8 @@ def main() -> None:
     tmp_dir = os.getenv("INGEST_TMP_DIR", ".ingest_tmp")
 
     summarize_fn = summarize_image_llava if (use_vision and summarize_image_llava is not None) else None
-    print(f"[DEBUG] Vision enabled: {use_vision}, summarize_fn available: {summarize_fn is not None}")
+    summarize_with_base64_fn = summarize_image_with_base64 if (use_vision and summarize_image_with_base64 is not None) else None
+    print(f"[DEBUG] Vision enabled: {use_vision}, summarize_fn available: {summarize_fn is not None}, base64_fn available: {summarize_with_base64_fn is not None}")
 
     num_files = 0
     total_elements = 0
@@ -148,7 +150,7 @@ def main() -> None:
                 image_lookup = _lookup
 
             try:
-                elements = load_file_to_elements(str(dest), base_meta, summarize_image_fn=summarize_fn, image_lookup=image_lookup)
+                elements = load_file_to_elements(str(dest), base_meta, summarize_image_fn=summarize_fn, summarize_image_with_base64_fn=summarize_with_base64_fn, image_lookup=image_lookup)
                 total_elements += len(elements)
                 chunks = chunk_elements(elements)
                 total_chunks += len(chunks)
@@ -190,7 +192,7 @@ def main() -> None:
 
                 image_lookup = _lookup
             try:
-                elements = load_file_to_elements(str(p), base_meta, summarize_image_fn=summarize_fn, image_lookup=image_lookup)
+                elements = load_file_to_elements(str(p), base_meta, summarize_image_fn=summarize_fn, summarize_image_with_base64_fn=summarize_with_base64_fn, image_lookup=image_lookup)
             except Exception as e:
                 print(f"[WARN] Skipping {p}: {e}")
                 continue

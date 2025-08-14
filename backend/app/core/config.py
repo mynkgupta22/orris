@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     
     # Database
-    database_url: str = "postgresql://postgres:root@localhost:5432/orris1"
+    database_url: str = "postgresql://postgres:root@localhost:5432/orris1,https://orris-4vg9-mynkgupta22s-projects.vercel.app"
     
     # JWT
     jwt_secret_key: str = "default-secret-key"
@@ -47,7 +47,9 @@ class Settings(BaseSettings):
     
     # Embeddings
     nomic_api_key: str = ""
-    hugging_face_api_key: str = ""
+    huggingface_api_key: str = ""
+    embedding_model_name: str = "BAAI/bge-m3"
+    embed_batch_size: int = 8
 
     # Document Processing
     chunk_size: str = "800"
@@ -60,17 +62,24 @@ class Settings(BaseSettings):
     gdrive_root_id: str = ""
     
     # CORS
-    allowed_origins: str = "http://192.168.0.87:3000,http://localhost:8080,http://192.168.0.93:8001,http://localhost:8001"
+    allowed_origins: str = "http://192.168.0.87:3000,http://localhost:8080,https://orris-4vg9.vercel.app,http://192.168.0.93:8001,http://localhost:3000,https://orris-4vg9.vercel.app"
     
     # Rate Limiting
     rate_limit_per_minute: int = 60 
     
     def get_allowed_origins(self) -> List[str]:
         if self.allowed_origins:
-            return [origin.strip() for origin in self.allowed_origins.split(",")]
-        return ["http://192.168.0.87:3000", "http://localhost:8080"]
-    
-    # (Removed legacy inner Config to avoid conflict with model_config in Pydantic v2)
+            origins = [origin.strip() for origin in self.allowed_origins.split(",")]
+            # Add both with and without trailing slashes for each origin
+            expanded_origins = []
+            for origin in origins:
+                expanded_origins.append(origin)
+                # if origin.endswith('/'):
+                #     expanded_origins.append(origin.rstrip('/'))
+                # else:
+                #     expanded_origins.append(origin + '/')
+            return expanded_origins
+        return ["http://192.168.0.87:3000", "http://localhost:8080","https://orris-4vg9.vercel.app","https://orris-4vg9-21sjup5fk-mynkgupta22s-projects.vercel.app"]
 
 
 @lru_cache()

@@ -86,3 +86,7 @@ backend/alembic/versions/2025_08_10_1759-edd6fcefb3d1_add_document_sync_tracking
 qdrant_storage/
 backend/.ingest_tmp/
 backend/app/rag/.ingest_tmp/
+
+# Service account and webhook files (sensitive/environment-specific)
+backend/app/rag/service-account.json
+backend/config/webhook_channels.json  # Deprecated: Now using database

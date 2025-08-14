@@ -30,6 +30,7 @@ class QueryResponse(BaseModel):
     answer: str
     query: str
     session_id: UUID
+    image_base64: Optional[str] = None  # Base64 encoding of the most relevant image
 
 class AuditLog(BaseModel):
     """Audit log entry for queries"""
