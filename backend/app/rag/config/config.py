@@ -12,9 +12,19 @@ class Config:
     GOOGLE_SERVICE_ACCOUNT_PATH = os.getenv('GOOGLE_SERVICE_ACCOUNT_PATH')
     EVIDEV_DATA_FOLDER_ID = os.getenv('EVIDEV_DATA_FOLDER_ID')
     
-    # Qdrant
-    QDRANT_HOST = os.getenv('QDRANT_HOST', 'localhost')
-    QDRANT_PORT = int(os.getenv('QDRANT_PORT', 6333))
+    # Qdrant - support both URL format and separate host/port
+    QDRANT_URL = os.getenv('QDRANT_URL')
+    if QDRANT_URL:
+        # Parse QDRANT_URL to extract host and port
+        from urllib.parse import urlparse
+        parsed = urlparse(QDRANT_URL)
+        QDRANT_HOST = parsed.hostname or 'localhost'
+        QDRANT_PORT = parsed.port or 6333
+    else:
+        # Fallback to separate host/port environment variables
+        QDRANT_HOST = os.getenv('QDRANT_HOST', 'localhost')
+        QDRANT_PORT = int(os.getenv('QDRANT_PORT', 6333))
+    
     QDRANT_COLLECTION_NAME = os.getenv('QDRANT_COLLECTION_NAME', 'orris_rag')
     
     # Nomic

@@ -330,9 +330,17 @@ async def _process_single_document(service, file_metadata):
             return
         
         # Delete existing chunks first (for updates)
-        deleted_count = delete_document_chunks(file_id)
-        if deleted_count > 0:
-            logger.info(f"Deleted {deleted_count} existing chunks for {file_name}")
+        try:
+            deleted_count = delete_document_chunks(file_id)
+            if deleted_count > 0:
+                logger.info(f"Deleted {deleted_count} existing chunks for {file_name}")
+        except ConnectionError as e:
+            logger.error(f"Failed to connect to vector database for deletion: {e}")
+            mark_document_failed(file_id, f"Vector database connection failed: {str(e)}")
+            return
+        except Exception as e:
+            logger.error(f"Failed to delete existing chunks for {file_name}: {e}")
+            # Continue processing even if deletion fails
         
         # Download file to temporary location
         tmp_dir = Path(os.getenv("INGEST_TMP_DIR", ".ingest_tmp"))
@@ -383,11 +391,20 @@ async def _process_single_document(service, file_metadata):
             chunks = chunk_elements(elements)
             
             if chunks:
-                written = upsert_document_chunks(chunks)
-                logger.info(f"Processed {file_name}: {len(elements)} elements, {len(chunks)} chunks, {written} indexed")
-                
-                # Mark as successfully synced
-                mark_document_synced(file_id)
+                try:
+                    written = upsert_document_chunks(chunks)
+                    logger.info(f"Processed {file_name}: {len(elements)} elements, {len(chunks)} chunks, {written} indexed")
+                    
+                    # Mark as successfully synced
+                    mark_document_synced(file_id)
+                except ConnectionError as e:
+                    logger.error(f"Failed to connect to vector database for upsert: {e}")
+                    mark_document_failed(file_id, f"Vector database connection failed: {str(e)}")
+                    return
+                except Exception as e:
+                    logger.error(f"Failed to upsert chunks for {file_name}: {e}")
+                    mark_document_failed(file_id, f"Vector database upsert failed: {str(e)}")
+                    return
             else:
                 logger.warning(f"No chunks generated for {file_name}")
                 mark_document_failed(file_id, "No chunks generated")
