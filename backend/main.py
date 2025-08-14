@@ -46,6 +46,20 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
+@app.get("/debug/cors", tags=["debug"])
+async def debug_cors():
+    """Debug endpoint to check CORS configuration"""
+    return {
+        "allowed_origins": settings.get_allowed_origins(),
+        "raw_allowed_origins": settings.allowed_origins,
+        "environment": settings.environment,
+        "cors_config": {
+            "allow_credentials": True,
+            "allow_methods": ["*"],
+            "allow_headers": ["*"]
+        }
+    }
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting Orris API...")
