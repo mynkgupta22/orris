@@ -27,7 +27,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['https://orris-4vg9.vercel.app'],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -60,30 +60,30 @@ async def debug_cors():
         }
     }
 
-@app.on_event("startup")
-async def startup_event():
-    logger.info("Starting Orris API...")
+# @app.on_event("startup")
+# async def startup_event():
+#     logger.info("Starting Orris API...")
     
-    # # Migrate existing JSON data to database (one-time operation)
-    # try:
-    #     migrated_count = migrate_json_to_database()
-    #     if migrated_count > 0:
-    #         logger.info(f"Migrated {migrated_count} webhook channels from JSON to database")
-    # except Exception as e:
-    #     logger.error(f"Error during JSON to database migration: {e}")
+#     # # Migrate existing JSON data to database (one-time operation)
+#     # try:
+#     #     migrated_count = migrate_json_to_database()
+#     #     if migrated_count > 0:
+#     #         logger.info(f"Migrated {migrated_count} webhook channels from JSON to database")
+#     # except Exception as e:
+#     #     logger.error(f"Error during JSON to database migration: {e}")
     
-    # Initialize webhooks if needed (this will create them in database)
-    try:
-        webhook_initialized = await ensure_webhook_initialized()
-        if webhook_initialized:
-            logger.info("Webhook initialization completed during startup")
-        else:
-            logger.info("Webhook initialization skipped (missing env vars) or failed")
-    except Exception as e:
-        logger.error(f"Error during webhook initialization: {e}")
+#     # Initialize webhooks if needed (this will create them in database)
+#     try:
+#         webhook_initialized = await ensure_webhook_initialized()
+#         if webhook_initialized:
+#             logger.info("Webhook initialization completed during startup")
+#         else:
+#             logger.info("Webhook initialization skipped (missing env vars) or failed")
+#     except Exception as e:
+#         logger.error(f"Error during webhook initialization: {e}")
     
-    # Start the webhook renewal service in the background
-    asyncio.create_task(run_webhook_renewal_service())
+#     # Start the webhook renewal service in the background
+#     asyncio.create_task(run_webhook_renewal_service())
 
 # if __name__ == "__main__":
 #     import uvicorn
