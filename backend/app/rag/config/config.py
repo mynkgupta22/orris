@@ -14,16 +14,19 @@ class Config:
     
     # Qdrant
     QDRANT_URL = os.getenv('QDRANT_URL')
+    QDRANT_API_KEY = os.getenv('QDRANT_API_KEY')
     if QDRANT_URL:
         # Parse QDRANT_URL to extract host and port
         from urllib.parse import urlparse
         parsed = urlparse(QDRANT_URL)
         QDRANT_HOST = parsed.hostname or 'localhost'
-        QDRANT_PORT = parsed.port or 6333
+        QDRANT_PORT = parsed.port or (443 if parsed.scheme == 'https' else 6333)
+        QDRANT_USE_SSL = parsed.scheme == 'https'
     else:
         # Fallback to separate host/port environment variables
         QDRANT_HOST = os.getenv('QDRANT_HOST', 'localhost')
         QDRANT_PORT = int(os.getenv('QDRANT_PORT', 6333))
+        QDRANT_USE_SSL = os.getenv('QDRANT_USE_SSL', 'false').lower() == 'true'
     QDRANT_COLLECTION_NAME = os.getenv('QDRANT_COLLECTION_NAME', 'orris_rag')
     
     # Nomic

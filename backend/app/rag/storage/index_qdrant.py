@@ -20,7 +20,20 @@ from app.rag.core.embed import EmbeddingClient, get_embedding_client
 
 def get_client() -> QdrantClient:
     cfg = load_qdrant_config()
-    return QdrantClient(host=cfg.host, port=cfg.port, api_key=cfg.api_key)
+    from app.rag.config.config import Config
+    
+    if Config.QDRANT_URL:
+        return QdrantClient(
+            url=Config.QDRANT_URL, 
+            api_key=cfg.api_key
+        )
+    else:
+        return QdrantClient(
+            host=cfg.host, 
+            port=cfg.port, 
+            https=getattr(Config, 'QDRANT_USE_SSL', False),
+            api_key=cfg.api_key
+        )
 
 
 def ensure_collection(client: QdrantClient, vector_size: int, *, force: bool = False) -> str:

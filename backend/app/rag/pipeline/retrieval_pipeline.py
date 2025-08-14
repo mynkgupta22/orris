@@ -49,8 +49,22 @@ class RetrievalPipeline:
 
     def _init_qdrant_client(self) -> QdrantClient:
         try:
-            client = QdrantClient(host=Config.QDRANT_HOST, port=Config.QDRANT_PORT)
-            logger.info(f"Connected to Qdrant at {Config.QDRANT_HOST}:{Config.QDRANT_PORT}")
+            if Config.QDRANT_URL:
+                # Use the full URL if provided
+                client = QdrantClient(
+                    url=Config.QDRANT_URL,
+                    api_key=Config.QDRANT_API_KEY
+                )
+                logger.info(f"Connected to Qdrant at {Config.QDRANT_URL}")
+            else:
+                # Use host/port configuration
+                client = QdrantClient(
+                    host=Config.QDRANT_HOST, 
+                    port=Config.QDRANT_PORT,
+                    https=getattr(Config, 'QDRANT_USE_SSL', False),
+                    api_key=Config.QDRANT_API_KEY
+                )
+                logger.info(f"Connected to Qdrant at {Config.QDRANT_HOST}:{Config.QDRANT_PORT}")
             return client
         except Exception as e:
             logger.error(f"Failed to connect to Qdrant: {e}")
