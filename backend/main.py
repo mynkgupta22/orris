@@ -63,6 +63,6 @@ async def startup_event():
     # Start the webhook renewal service in the background
     asyncio.create_task(run_webhook_renewal_service())
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8001)
