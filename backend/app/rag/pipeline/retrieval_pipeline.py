@@ -142,7 +142,7 @@ class RetrievalPipeline:
 
             # 5) Select post-k
             final_chunks = sorted(candidate_chunks, key=lambda x: x.score, reverse=True)[:top_k_post]
-
+            logger.info(f"finallllllllllllll chunks {final_chunks})
             # 6) Extract image_base64 from the most similar chunk (first one)
             image_base64 = None
             if final_chunks:
@@ -215,7 +215,7 @@ class RetrievalPipeline:
                 else:
                     # Logic for Gemini (following the OpenAI format)
                     try:
-                        logger.info("Sending request to Google Gemini model")
+                        logger.info(f"conetxttttttttt---{context_text}")
                         system_text = """
                                 You are a secure assistant that answers questions based on the provided context.
 
