@@ -7,6 +7,7 @@ class QueryRequest(BaseModel):
     """Request model for retrieval queries"""
     query: str = Field(..., min_length=1, max_length=1000, description="Search query")
     session_id: Optional[UUID] = Field(None, description="Chat session ID for multi-turn conversation")
+    use_finllama: bool = Field(False, description="If true, use Fin-LLaMA model. If false, use Gemini model.")
     top_k_pre: Optional[int] = Field(30, ge=1, le=100, description="Number of candidates to retrieve before reranking")
     top_k_post: Optional[int] = Field(7, ge=1, le=20, description="Number of final results after reranking")
 

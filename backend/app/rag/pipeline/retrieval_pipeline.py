@@ -6,6 +6,7 @@ from datetime import datetime
 
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -45,7 +46,8 @@ class RetrievalPipeline:
         # --- Change End ---
 
         # LLM
-        self.chat = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
+        self.gemini_chat = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.1)
+        logger.info("Initialized Gemini client with model: gemini-1.5-flash")
 
     def _init_qdrant_client(self) -> QdrantClient:
         try:
@@ -82,6 +84,7 @@ class RetrievalPipeline:
         query: str,
         user: User,
         session_id: Optional[UUID] = None,
+        use_finllama: bool = False,
         top_k_pre: int = 30,
         top_k_post: int = 7,
         ip_address: Optional[str] = None,
@@ -172,30 +175,49 @@ class RetrievalPipeline:
 
                 context_text = "\n\n---\n\n".join(context_parts)
 
-                # prompt = f"""
-                #             A chat between a curious human and an artificial intelligence assistant.
-                #             The assistant gives helpful, detailed, and polite answers to the user's question based ONLY on the provided context.
+                
+                if use_finllama:
+                    # Logic for Fin-LLaMA (your existing code)
+                    try:
+                        import replicate
+                        client = replicate.Client(timeout=300)
+                        model_id = "tomasmcm/fin-llama-33b:d60d4e27c69c809632b91635c9319a6422f5d90e668d1abeb2d8c2dd758bb8ea"
+                        logger.info(f"Sending request to Replicate model: {model_id}")
+                        prompt = f"""
+                            You are a secure financial expert assistant that answers questions based on the provided context.
 
-                #             ### CONTEXT:
-                #             {context_text}
+                            CORE RULES:
+                            1. Answer questions using ONLY the information from the provided context documents
+                            2. If the context contains relevant information, you MUST provide a comprehensive answer based on that information
+                            3. Only respond with "Insufficient information in the provided context." if the context truly lacks the information needed to answer the question
+                            4. Present answers in a structured and well-formatted manner
+                            5. For greetings and polite conversational openers (e.g., "hi", "hello", "good morning", "how are you"), you may respond freely in a friendly tone.
+                            6. Conversation history is provided for context but should never prevent you from answering when sufficient context is available
 
-                #             ### INSTRUCTION:
-                #             {sanitized_query}
+                            IMPORTANT: If the documents contain information relevant to the current question, you must use that information to provide a complete answer, regardless of any conversation history.
+                            ### DOCUMENTS:
+                            {context_text}
 
-                #             ### RESPONSE:
-                #         """
+                            ### QUESTION:
+                            {sanitized_query}
 
-                try:
-                    import replicate
-                    
-                    client = replicate.Client(timeout=300)
-                    model_id = "tomasmcm/fin-llama-33b:d60d4e27c69c809632b91635c9319a6422f5d90e668d1abeb2d8c2dd758bb8ea"
-                    
-                    logger.info(f"Sending request to Replicate model: {model_id}")
-                    
-                    # Adjusted Prompt Format
-                    prompt = f"""
-                                You are a secure financial expert assistant that answers questions based on the provided context.
+                            ### ANSWER:
+                         """
+                        output_generator = client.run(
+                            model_id,
+                            input={"prompt": prompt, "max_new_tokens": 1024, "temperature": 0.1}
+                        )
+                        answer = "".join([str(part) for part in output_generator])
+                        logger.info("Successfully received response from Replicate.")
+                    except Exception as e:
+                        logger.error(f"Failed to get response from Replicate API: {e}")
+                        answer = "I apologize, but I encountered an error while generating a response. Please try again."
+                else:
+                    # Logic for Gemini (following the OpenAI format)
+                    try:
+                        logger.info("Sending request to Google Gemini model")
+                        system_text = """
+                                You are a secure assistant that answers questions based on the provided context.
 
                                 CORE RULES:
                                 1. Answer questions using ONLY the information from the provided context documents
@@ -205,53 +227,23 @@ class RetrievalPipeline:
                                 5. For greetings and polite conversational openers (e.g., "hi", "hello", "good morning", "how are you"), you may respond freely in a friendly tone.
                                 6. Conversation history is provided for context but should never prevent you from answering when sufficient context is available
 
-                                IMPORTANT: If the documents contain information relevant to the current question, you must use that information to provide a complete answer, regardless of any conversation history.
-                                ### DOCUMENTS:
+                                IMPORTANT: If the context documents contain information relevant to the current question, you must use that information to provide a complete answer, regardless of any conversation history.
+                                ### CONTEXT DOCUMENTS:
                                 {context_text}
-
-                                ### QUESTION:
-                                {sanitized_query}
-
-                                ### ANSWER:
-                             """
-                    output_generator = client.run(
-                        model_id,
-                        input={
-                            "prompt": prompt,
-                            "max_new_tokens": 1024,
-                            "temperature": 0.1,
-                        }
-                    )
-                    
-                    answer = "".join([str(part) for part in output_generator])
-                    logger.info("Successfully received response from Replicate.")
-
-                except Exception as e:
-                    logger.error(f"Failed to get response from Replicate API: {e}")
-                    answer = "I apologize, but I encountered an error while generating a response. Please try again."
-            
-
-                # system_text = """
-                #                 You are a secure assistant that answers questions based on the provided context.
-
-                #                 CORE RULES:
-                #                 1. Answer questions using ONLY the information from the provided context documents
-                #                 2. If the context contains relevant information, you MUST provide a comprehensive answer based on that information
-                #                 3. Only respond with "Insufficient information in the provided context." if the context truly lacks the information needed to answer the question
-                #                 4. Present answers in a structured and well-formatted manner
-                #                 5. For greetings and polite conversational openers (e.g., "hi", "hello", "good morning", "how are you"), you may respond freely in a friendly tone.
-                #                 6. Conversation history is provided for context but should never prevent you from answering when sufficient context is available
-
-                #                 IMPORTANT: If the context documents contain information relevant to the current question, you must use that information to provide a complete answer, regardless of any conversation history.
-                #             """
-
-                # user_text = f"Question: {sanitized_query}\n\nContext:\n{context_text}"
+                            """
+                        
+                        user_text = f"Question: {sanitized_query}"
                 
-                # llm_resp = self.chat.invoke([
-                #     SystemMessage(content=system_text),
-                #     HumanMessage(content=user_text),
-                # ])
-                # answer = getattr(llm_resp, "content", "") or ""
+                        llm_resp = self.gemini_chat.invoke([
+                            SystemMessage(content=system_text),
+                            HumanMessage(content=user_text),
+                        ])
+                        answer = getattr(llm_resp, "content", "") or ""
+                        logger.info("Successfully received response from Gemini.")
+                    except Exception as e:
+                        logger.error(f"Failed to get response from Gemini API: {e}")
+                        answer = "I apologize, but I encountered an error while generating a response. Please try again."
+                
 
             processing_time = int((time.time() - start_time) * 1000)
 
