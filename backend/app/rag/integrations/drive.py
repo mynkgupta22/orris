@@ -225,5 +225,7 @@ def classify_from_path(path_segments: List[str]) -> tuple[bool, Optional[str], L
         is_pi = True
         uid = path_segments[1]
         roles = ["pi"]
+    logger.info(f"Documents details ------{path_segments}!!!!!{is_pi}@@@@@{uid}####{roles}")
+    
     return is_pi, uid, roles
 
