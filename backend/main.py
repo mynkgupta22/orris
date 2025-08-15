@@ -8,6 +8,7 @@ from app.services.webhook_renewal import run_webhook_renewal_service, ensure_web
 import os
 import certifi
 import logging
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,36 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
+async def keep_alive_task():
+    """
+    A background task that pings the /health endpoint every 14 minutes
+    to prevent the Render free-tier service from spinning down.
+    """
+    # Render provides the public URL of the service in this env var
+    render_external_url = os.getenv("RENDER_EXTERNAL_URL")
+
+    if not render_external_url:
+        logger.warning("RENDER_EXTERNAL_URL not set. Keep-alive task will not run.")
+        return
+
+    health_check_url = f"{render_external_url}/health"
+    
+    # Wait a moment before starting the first ping
+    await asyncio.sleep(60) # Sleep for 1 minute on startup
+    
+    while True:
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(health_check_url)
+                response.raise_for_status()  # Raise an exception for 4xx/5xx errors
+                logger.info(f"Keep-alive ping successful to {health_check_url}, status: {response.status_code}")
+        except httpx.RequestError as e:
+            logger.error(f"Keep-alive ping failed: {e}")
+        
+        # Wait for 14 minutes before the next ping (15 minutes is Render's timeout)
+        await asyncio.sleep(14 * 60)
+
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize webhooks if needed (this will create them in database)"""
@@ -59,6 +90,9 @@ async def startup_event():
 
     # Start the webhook renewal service in the background
     asyncio.create_task(run_webhook_renewal_service())
+
+    asyncio.create_task(keep_alive_task())
+
 
 # if __name__ == "__main__":
 #     import uvicorn
