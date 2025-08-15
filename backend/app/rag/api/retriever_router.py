@@ -91,6 +91,7 @@ async def query_documents(
             query=enhanced_query,
             user=current_user,
             session_id=chat_session.session_id,
+            use_finllama=request.use_finllama,
             top_k_pre=request.top_k_pre,
             top_k_post=request.top_k_post,
             ip_address=client_ip,
@@ -101,7 +102,8 @@ async def query_documents(
         chat_service.add_assistant_response(
             chat_session.session_id, 
             current_user.id, 
-            rag_response.answer
+            rag_response.answer,
+            rag_response.image_base64
         )
         
         # Calculate processing time
