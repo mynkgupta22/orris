@@ -172,34 +172,57 @@ class RetrievalPipeline:
 
                 context_text = "\n\n---\n\n".join(context_parts)
 
-                prompt = f"""
-                            A chat between a curious human and an artificial intelligence assistant.
-                            The assistant gives helpful, detailed, and polite answers to the user's question based ONLY on the provided context.
+                # prompt = f"""
+                #             A chat between a curious human and an artificial intelligence assistant.
+                #             The assistant gives helpful, detailed, and polite answers to the user's question based ONLY on the provided context.
 
-                            ### CONTEXT:
-                            {context_text}
+                #             ### CONTEXT:
+                #             {context_text}
 
-                            ### INSTRUCTION:
-                            {sanitized_query}
+                #             ### INSTRUCTION:
+                #             {sanitized_query}
 
-                            ### RESPONSE:
-                        """
+                #             ### RESPONSE:
+                #         """
 
                 try:
                     import replicate
                     
+                    client = replicate.Client(timeout=300)
                     model_id = "tomasmcm/fin-llama-33b:d60d4e27c69c809632b91635c9319a6422f5d90e668d1abeb2d8c2dd758bb8ea"
                     
-                    # The replicate.run() function returns a generator for streaming output.
-                    # We join the parts to get the full string response.
-                    output_generator = replicate.run(
+                    logger.info(f"Sending request to Replicate model: {model_id}")
+                    
+                    # Adjusted Prompt Format
+                    prompt = f"""
+                                You are a secure financial expert assistant that answers questions based on the provided context.
+
+                                CORE RULES:
+                                1. Answer questions using ONLY the information from the provided context documents
+                                2. If the context contains relevant information, you MUST provide a comprehensive answer based on that information
+                                3. Only respond with "Insufficient information in the provided context." if the context truly lacks the information needed to answer the question
+                                4. Present answers in a structured and well-formatted manner
+                                5. For greetings and polite conversational openers (e.g., "hi", "hello", "good morning", "how are you"), you may respond freely in a friendly tone.
+                                6. Conversation history is provided for context but should never prevent you from answering when sufficient context is available
+
+                                IMPORTANT: If the documents contain information relevant to the current question, you must use that information to provide a complete answer, regardless of any conversation history.
+                                ### DOCUMENTS:
+                                {context_text}
+
+                                ### QUESTION:
+                                {sanitized_query}
+
+                                ### ANSWER:
+                             """
+                    output_generator = client.run(
                         model_id,
                         input={
                             "prompt": prompt,
-                            "max_new_tokens": 1024, # Adjust as needed
-                            "temperature": 0.1,      # Adjust as needed
+                            "max_new_tokens": 1024,
+                            "temperature": 0.1,
                         }
                     )
+                    
                     answer = "".join([str(part) for part in output_generator])
                     logger.info("Successfully received response from Replicate.")
 
