@@ -118,6 +118,9 @@ service-account.json
 /tmp/
 *.tmp
 
+# Local Google Drive sync state
+.drive_sync_state
+
 # IDE
 .vscode/
 .idea/
