@@ -225,10 +225,10 @@ def classify_from_path(path_segments: List[str]) -> tuple[bool, Optional[str], L
     roles = ["non_pi"]
     if not path_segments:
         return is_pi, uid, roles
-    first = path_segments[0].strip().lower()
+    first = path_segments[1].strip().lower()
     if first == "pi" and len(path_segments) >= 2:
         is_pi = True
-        uid = path_segments[1]
+        uid = path_segments[2]
         roles = ["pi"]
     logger.info(f"Documents details ------{path_segments}!!!!!{is_pi}@@@@@{uid}####{roles}")
     
