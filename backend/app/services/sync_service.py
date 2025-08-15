@@ -6,6 +6,8 @@ from pathlib import Path
 import asyncio
 import certifi
 from googleapiclient.errors import HttpError
+import logging
+
 
 # Configure SSL certificates for Google API calls
 os.environ['SSL_CERT_FILE'] = certifi.where()
@@ -17,6 +19,10 @@ from app.rag.storage.sync_tracker import track_document_sync, mark_document_sync
 from app.rag.storage.index_qdrant import delete_document_chunks, upsert_document_chunks
 from app.rag.core.loaders import load_file_to_elements
 from app.rag.core.chunking import chunk_elements
+
+logger = logging.getLogger(__name__)
+
+
 
 try:
     from app.rag.integrations.vision import summarize_image_with_base64

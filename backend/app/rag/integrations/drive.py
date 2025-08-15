@@ -9,6 +9,11 @@ import os
 import json
 import certifi
 import httplib2
+import logging
+
+
+logger = logging.getLogger(__name__)
+
 
 # Configure SSL certificates for Google API calls
 os.environ['SSL_CERT_FILE'] = certifi.where()
