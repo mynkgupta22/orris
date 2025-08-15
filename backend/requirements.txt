@@ -36,7 +36,6 @@ replicate==1.0.7
 qdrant_client==1.15.1
 
 # Document Processing
-unstructured[pdf]
 pypdf==6.0.0
 PyMuPDF
 pandas==2.3.1
