@@ -291,6 +291,7 @@ export default function ChatInterface() {
                       content: m.content,
                       sender: m.role === 'human' ? 'user' : 'ai',
                       timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+                      imageBase64: m.image_base64, // Include image_base64 from chat history
                     }))
                     setMessages(
                       loadedMessages.length > 0
