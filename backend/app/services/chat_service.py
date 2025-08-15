@@ -53,17 +53,25 @@ class ChatService:
         except NoResultFound:
             return None
 
-    def add_assistant_response(self, session_id: UUID, user_id: int, response: str) -> bool:
+    def add_assistant_response(self, session_id: UUID, user_id: int, response: str,image_base64: Optional[str] = None) -> bool:
         """Add assistant response to existing chat session"""
         chat_session = self.get_chat_session(session_id, user_id)
         if not chat_session:
             return False
             
-        chat_session.add_message(
-            role="assistant",
-            content=response,
-            timestamp=datetime.now(timezone.utc).isoformat()
-        )
+        # 1. Start with the arguments that are always present
+        message_data = {
+            "role": "assistant",
+            "content": response,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+        # 2. Conditionally add the image if it exists and is not an empty string
+        if image_base64:
+            message_data["image_base64"] = image_base64
+
+        # 3. Add the message using dictionary unpacking
+        chat_session.add_message(**message_data)
         
         self.db.commit()
         return True
