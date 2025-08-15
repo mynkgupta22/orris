@@ -142,7 +142,7 @@ class RetrievalPipeline:
 
             # 5) Select post-k
             final_chunks = sorted(candidate_chunks, key=lambda x: x.score, reverse=True)[:top_k_post]
-            logger.info(f"finallllllllllllll chunks {final_chunks})
+            logger.info(f"finallllllllllllll chunks {final_chunks}")
             # 6) Extract image_base64 from the most similar chunk (first one)
             image_base64 = None
             if final_chunks:
