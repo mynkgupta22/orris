@@ -155,7 +155,14 @@ class RetrievalPipeline:
                         with_payload=True
                     )
                     if chunk_result and chunk_result[0].payload:
-                        image_base64 = chunk_result[0].payload.get("image_base64")
+                        # image_base64 = chunk_result[0].payload.get("image_base64")
+                        payload = chunk_result[0].payload
+                        # Only return image_base64 if this chunk is actually an image chunk
+                        if payload.get("is_image", False):
+                            image_base64 = payload.get("image_base64")
+                            logger.info(f"Returning image_base64 from image chunk {first_chunk_id}")
+                        else:
+                            logger.info(f"Top chunk {first_chunk_id} is not an image chunk, not returning image_base64")
                 except Exception as e:
                     logger.warning(f"Failed to retrieve image_base64 from chunk {first_chunk_id}: {e}")
 
