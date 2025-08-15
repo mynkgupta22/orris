@@ -24,7 +24,7 @@ class ChatHistory(Base):
     user = relationship("User", back_populates="chat_histories")
     query_logs = relationship("QueryLog", back_populates="chat_session", cascade="all, delete-orphan")
     
-    def add_message(self, role: str, content: str, timestamp: str = None):
+    def add_message(self, role: str, content: str, timestamp: str = None, image_base64: Optional[str] = None):
         """Add a message to the conversation"""
         if timestamp is None:
             timestamp = func.now()
@@ -32,12 +32,19 @@ class ChatHistory(Base):
         if not self.conversation_data:
             self.conversation_data = {"messages": []}
             
-        self.conversation_data["messages"].append({
-            "role": role,  # "human" or "assistant"
+        # 1. Create the base message dictionary
+        new_message = {
+            "role": role,
             "content": content,
             "timestamp": timestamp
-        })
-        
+         }
+
+         # 2. Conditionally add the image if it was provided
+        if image_base64:
+          new_message["image_base64"] = image_base64
+
+        self.conversation_data["messages"].append(new_message)
+
         # Mark the column as changed for SQLAlchemy tracking
         from sqlalchemy.orm.attributes import flag_modified
         flag_modified(self, "conversation_data")
