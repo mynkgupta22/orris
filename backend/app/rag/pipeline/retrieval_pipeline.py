@@ -216,7 +216,7 @@ class RetrievalPipeline:
                     # Logic for Gemini (following the OpenAI format)
                     try:
                         logger.info(f"conetxttttttttt---{context_text}")
-                        system_text = """
+                        system_text = f"""
                                 You are a secure assistant that answers questions based on the provided context.
 
                                 CORE RULES:
