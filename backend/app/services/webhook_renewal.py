@@ -105,7 +105,7 @@ def get_folders_for_webhook_monitoring(drive_service, root_folder_id: str, inclu
 async def initialize_webhooks_if_needed():
     """Initialize webhooks if no active webhooks exist and environment variables are set"""
     from app.core.database import SessionLocal
-    from app.services.drive_service import get_drive_service  # Assume this exists
+    from app.rag.integrations.drive import get_drive_service  # Assume this exists
     
     db = SessionLocal()
     try:
@@ -197,11 +197,9 @@ async def initialize_webhooks_if_needed():
 async def check_and_renew_webhooks():
     """Check all active webhooks and renew those nearing expiration"""
     from app.core.database import SessionLocal
-    db = SessionLocal()
+    db_for_check = SessionLocal()
     try:
-        # First, try to initialize webhooks if none exist
-        active_channels = WebhookChannelService.get_active_webhook_channels(db)
-        
+        active_channels = WebhookChannelService.get_active_webhook_channels(db_for_check)
         if not active_channels:
             logger.info("No active webhook channels found, attempting to initialize...")
             initialized = await initialize_webhooks_if_needed()
@@ -209,54 +207,55 @@ async def check_and_renew_webhooks():
                 logger.warning("Could not initialize webhooks, skipping renewal check")
                 return
             # Refresh the active channels list
-            active_channels = WebhookChannelService.get_active_webhook_channels(db)
-        
-        # Get channels that are expiring soon (next 6 hours)
-        expiring_channels = WebhookChannelService.get_expiring_channels(db, hours_before_expiry=6)
-        
-        if not expiring_channels:
-            logger.info("No webhooks need renewal at this time")
-            return
-        
-        renewed_count = 0
-        failed_count = 0
-        
-        for channel in expiring_channels:
-            logger.info(f"Renewing webhook for folder '{channel.description}' ({channel.folder_id}), channel {channel.channel_id}")
-            
-            try:
-                # Setup new webhook
-                new_channel_info = setup_drive_webhook(channel.webhook_url, channel.folder_id)
-                
-                # Deactivate the old channel
-                WebhookChannelService.deactivate_webhook_channel(db, channel.channel_id)
-                
-                # Create new channel entry
-                new_channel_data = {
-                    "channel_id": new_channel_info.get('id'),
-                    "resource_id": new_channel_info.get('resourceId'),
-                    "folder_id": channel.folder_id,
-                    "webhook_url": channel.webhook_url,
-                    "description": channel.description,
-                    "expiration": new_channel_info.get('expiration'),
-                    "status": "active"
-                }
-                
-                WebhookChannelService.create_webhook_channel(db, new_channel_data)
-                renewed_count += 1
-                
-                logger.info(f"Successfully renewed webhook: {channel.channel_id} -> {new_channel_info.get('id')}")
-                
-            except Exception as e:
-                logger.error(f"Failed to renew webhook {channel.channel_id}: {str(e)}")
-                failed_count += 1
-        
-        logger.info(f"Renewal process completed: {renewed_count} webhooks renewed, {failed_count} failed")
-                
-    except Exception as e:
-        logger.error(f"Error in webhook renewal process: {str(e)}")
+            active_channels = WebhookChannelService.get_active_webhook_channels(db_for_check)
+
+        expiring_channels = WebhookChannelService.get_expiring_channels(db_for_check, hours_before_expiry=6)
     finally:
-        db.close()
+        db_for_check.close()
+
+
+    if not expiring_channels:
+        logger.info("No webhooks need renewal at this time")
+        return
+    
+    renewed_count = 0
+    failed_count = 0
+    
+    # *** THE FIX IS HERE: Loop through the channels, and manage the DB session INSIDE the loop ***
+    for channel in expiring_channels:
+        logger.info(f"Renewing webhook for folder '{channel.description}' ({channel.folder_id}), channel {channel.channel_id}")
+        
+        db = SessionLocal() # <-- Create a fresh session for each renewal
+        try:
+            # Setup new webhook
+            new_channel_info = setup_drive_webhook(channel.webhook_url, channel.folder_id)
+            
+            # Deactivate the old channel
+            WebhookChannelService.deactivate_webhook_channel(db, channel.channel_id)
+            
+            # Create new channel entry
+            new_channel_data = {
+                "channel_id": new_channel_info.get('id'),
+                "resource_id": new_channel_info.get('resourceId'),
+                "folder_id": channel.folder_id,
+                "webhook_url": channel.webhook_url,
+                "description": channel.description,
+                "expiration": new_channel_info.get('expiration'),
+                "status": "active"
+            }
+            
+            WebhookChannelService.create_webhook_channel(db, new_channel_data)
+            renewed_count += 1
+            
+            logger.info(f"Successfully renewed webhook: {channel.channel_id} -> {new_channel_info.get('id')}")
+            
+        except Exception as e:
+            logger.error(f"Failed to renew webhook {channel.channel_id}: {str(e)}")
+            failed_count += 1
+        finally:
+            db.close() # <-- Close the session at the end of each renewal
+
+    logger.info(f"Renewal process completed: {renewed_count} webhooks renewed, {failed_count} failed")
 
 async def run_webhook_renewal_service():
     """Run the webhook renewal service continuously"""
@@ -281,7 +280,7 @@ async def ensure_webhook_initialized():
 async def refresh_webhook_folders():
     """Discover new subfolders and create webhooks for them if needed"""
     from app.core.database import SessionLocal
-    from app.services.drive_service import get_drive_service
+    from app.rag.integrations.drive import get_drive_service
     
     db = SessionLocal()
     try:
