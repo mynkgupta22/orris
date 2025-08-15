@@ -71,7 +71,9 @@ Orris serves as an intelligent knowledge management system that:
 
 ## 🏗️ Architecture
 
-[![System Flow Diagram](assets/Diagram_Seq.svg)](assets/Diagram_Seq.svg)
+View the system flow diagram:
+
+[System Flow Diagram](https://www.mermaidchart.com/app/projects/9a5872e8-507a-4170-815a-bc51d884ac11/diagrams/7e8c9ccc-82a0-4fdd-a3e7-35d4048f8009/share/invite/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkb2N1bWVudElEIjoiN2U4YzljY2MtODJhMC00ZmRkLWEzZTctMzVkNDA0OGY4MDA5IiwiYWNjZXNzIjoiVmlldyIsImlhdCI6MTc1NTI0MzE5Nn0.9G1GqO7_v82t0yDdWmcZBAe9eSLRCsB7QnnqvgSijQQ)
 
 
 ### System Components
