@@ -4,6 +4,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.mutable import MutableDict
 import uuid
+from typing import Optional
 
 from app.core.database import Base
 
