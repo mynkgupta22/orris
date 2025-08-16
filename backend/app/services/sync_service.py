@@ -132,7 +132,7 @@ async def _resolve_folder_path(service, parents: list) -> list[str]:
         return []
 
 
-async def _get_file_metadata_with_retry(service, file_id: str, max_retries: int = 6):
+async def _get_file_metadata_with_retry(service, file_id: str, max_retries: int = 2):
     """
     Get file metadata from Google Drive with retry logic for 404 errors.
     
@@ -160,8 +160,8 @@ async def _get_file_metadata_with_retry(service, file_id: str, max_retries: int 
                 if attempt < max_retries:
                     # Wait with longer exponential backoff for Google Drive processing delays
                     # Start with 3s, then 6s, 12s, 24s, 48s, 96s
-                    wait_time = 3 * (2 ** attempt)
-                    logger.info(f"File {file_id} not found (attempt {attempt + 1}/{max_retries + 1}), retrying in {wait_time}s")
+                    # wait_time = 3 * (2 ** attempt)
+                    # logger.info(f"File {file_id} not found (attempt {attempt + 1}/{max_retries + 1}), retrying in {wait_time}s")
                     await asyncio.sleep(wait_time)
                 else:
                     logger.warning(f"File {file_id} not found after {max_retries + 1} attempts. This might be:")
@@ -556,7 +556,7 @@ def setup_drive_webhook(webhook_url: str, folder_id: str) -> dict:
 
         import time
 
-        expiration = int((time.time() + 7*24*3600) * 1000)  
+        expiration = int((time.time() + 24*3600) * 1000)  
         
         channel_body = {
             'id': channel_id,

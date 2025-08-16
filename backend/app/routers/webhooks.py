@@ -40,24 +40,13 @@ async def google_drive_webhook(
         
         # Log all headers with clear formatting
         all_headers = dict(request.headers)
-        print("📋 ALL HEADERS:")
         for key, value in all_headers.items():
             print(f"   {key}: {value}")
         
-        # Log specific Google headers
-        print("\n🔍 GOOGLE-SPECIFIC HEADERS:")
-        print(f"   Channel ID: {x_goog_channel_id}")
-        print(f"   Channel Token: {x_goog_channel_token}")
-        print(f"   Resource ID: {x_goog_resource_id}")
-        print(f"   Resource State: {x_goog_resource_state}")
-        print(f"   Message Number: {x_goog_message_number}")
-        print(f"   Changed: {x_goog_changed}")
-        
+       
         # Get request body and log it
         body = await request.body()
-        print(f"\n📦 REQUEST BODY:")
-        print(f"   Raw body: {body}")
-        print(f"   Body length: {len(body)} bytes")
+  
         
         # Try to parse body as JSON if it's not empty
         if body:
@@ -69,13 +58,7 @@ async def google_drive_webhook(
         else:
             print("   Body is empty")
         
-        # Log request method and URL
-        print(f"\n🌐 REQUEST INFO:")
-        print(f"   Method: {request.method}")
-        print(f"   URL: {request.url}")
-        print(f"   Client: {request.client}")
-        
-        print("=" * 80)
+      
         
         # Original logging for backwards compatibility
         logger.info(f"Received Google Drive webhook: channel={x_goog_channel_id}, "
