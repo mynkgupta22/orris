@@ -49,6 +49,7 @@ export interface QueryRequestBody {
   session_id?: UUID
   top_k_pre?: number
   top_k_post?: number
+  use_finllama?: boolean
 }
 
 export interface QueryResponseBody {

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ImageChunk } from '@/components/ui/image-chunk'
-import { Brain, Send, Shield, Clock, FileText, User, Bot, Menu, Search, LogOut, Lock, Trash, X } from 'lucide-react'
+import { Brain, Send, Shield, Clock, FileText, User, Bot, Menu, Search, LogOut, Lock, Trash, X, ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -34,6 +34,8 @@ interface ChatHistory {
   timestamp: Date
 }
 
+type ModelType = 'default' | 'gemini' | 'finllama'
+
 export default function ChatInterface() {
   const router = useRouter()
   const { logout } = useAuthStore()
@@ -51,13 +53,43 @@ export default function ChatInterface() {
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [selectedModel, setSelectedModel] = useState<ModelType>('default')
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const modelDropdownRef = useRef<HTMLDivElement>(null)
   const { accessToken } = useAuthStore()
   const [roleText, setRoleText] = useState<string>('Signed Up')
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [profile, setProfile] = useState<any>(null)
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
+
+  // Model options configuration
+  const modelOptions = [
+    { value: 'default' as ModelType, label: 'Default', description: 'Standard model' },
+    { value: 'gemini' as ModelType, label: 'Gemini', description: 'Google Gemini model' },
+    { value: 'finllama' as ModelType, label: 'Fin-Llama', description: 'Financial Llama model' }
+  ]
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(event.target as Node)) {
+        setModelDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Get use_finllama value based on selected model
+  const getUseFinllama = (model: ModelType): boolean => {
+    return model === 'finllama'
+  }
+
+  // Get selected model display info
+  const selectedModelInfo = modelOptions.find(option => option.value === selectedModel)
 
   // Decode JWT to get role and keep it updated when token changes
   useEffect(() => {
@@ -154,10 +186,12 @@ export default function ChatInterface() {
 
     try {
       // Call the RAG API, including session_id if continuing an existing session
+      // and the use_finllama parameter based on selected model
       const response = await ragApi.query({
         query: userQuery,
         top_k_pre: 30,
         top_k_post: 7,
+        use_finllama: getUseFinllama(selectedModel),
         ...(sessionId ? { session_id: sessionId } : {}),
       })
 
@@ -431,6 +465,7 @@ export default function ChatInterface() {
                 <Shield className="w-4 h-4 text-green-600" />
                 <span>Privacy protection active</span>
                 <Badge variant="secondary" className="text-xs">{roleText}</Badge>
+                <Badge variant="outline" className="text-xs">{selectedModelInfo?.label}</Badge>
               </div>
             </div>
           </div>
@@ -692,6 +727,43 @@ export default function ChatInterface() {
         <div className="bg-white border-t border-gray-200 p-4">
           <div className="max-w-4xl mx-auto">
             <div className="flex space-x-4">
+              {/* Model Selection Dropdown */}
+              <div className="relative" ref={modelDropdownRef}>
+                <button
+                  onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
+                  className="flex items-center space-x-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-12"
+                  disabled={isLoading}
+                >
+                  <Brain className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm text-gray-700">{selectedModelInfo?.label}</span>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${modelDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {modelDropdownOpen && (
+                  <div className="absolute bottom-full mb-2 left-0 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                    <div className="p-2">
+                      {modelOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => {
+                            setSelectedModel(option.value)
+                            setModelDropdownOpen(false)
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+                            selectedModel === option.value
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                              : 'hover:bg-gray-50 text-gray-700'
+                          }`}
+                        >
+                          <div className="font-medium text-sm">{option.label}</div>
+                          <div className="text-xs text-gray-500">{option.description}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex-1 relative">
                 <Input
                   value={inputValue}
@@ -718,6 +790,10 @@ export default function ChatInterface() {
               <div className="flex items-center space-x-1">
                 <Lock className="w-3 h-3 text-blue-600" />
                 <span>Enterprise secure</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <Brain className="w-3 h-3 text-purple-600" />
+                <span>Model: {selectedModelInfo?.label}</span>
               </div>
             </div>
           </div>
