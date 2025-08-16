@@ -101,7 +101,7 @@ async def google_drive_webhook(
             raise HTTPException(status_code=401, detail="Invalid webhook signature")
         
         # Handle different resource states
-        if x_goog_resource_state in ["update", "add", "remove", "trash"]:
+        if x_goog_resource_state in ["change","update", "add", "remove", "trash"]:
             # Add the notification to background processing queue
             background_tasks.add_task(
                 process_drive_change_notification,
