@@ -83,8 +83,8 @@ async def query_documents(
         
         # Build enhanced query with conversation context
         enhanced_query = request.query
-        if conversation_context:
-            enhanced_query = f"{conversation_context}Current question: {request.query}"
+        # if conversation_context:
+        #     enhanced_query = f"{conversation_context}Current question: {request.query}"
         
         # Process the query with the retriever service
         rag_response = await retriever_service.retrieve_and_answer(
