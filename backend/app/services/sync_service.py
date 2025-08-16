@@ -571,14 +571,14 @@ def setup_drive_webhook(webhook_url: str, folder_id: str) -> dict:
         logger.info(f"Webhook payload: {channel_body}")
         
         # Watch the folder for changes
-        # response = service.files().watch(
-        #     fileId=folder_id,
-        #     body=channel_body
-        # ).execute()
-        response = service.changes().watch(
-            pageToken=service.changes().getStartPageToken().execute()["startPageToken"],
+        response = service.files().watch(
+            fileId=folder_id,
             body=channel_body
         ).execute()
+        # response = service.changes().watch(
+        #     pageToken=service.changes().getStartPageToken().execute()["startPageToken"],
+        #     body=channel_body
+        # ).execute()
         
         logger.info(f"✅ Webhook setup successful! Response: {response}")
         return response
