@@ -160,7 +160,7 @@ async def _get_file_metadata_with_retry(service, file_id: str, max_retries: int 
                 if attempt < max_retries:
                     # Wait with longer exponential backoff for Google Drive processing delays
                     # Start with 3s, then 6s, 12s, 24s, 48s, 96s
-                    # wait_time = 3 * (2 ** attempt)
+                    wait_time = 1 * (2 ** attempt)
                     # logger.info(f"File {file_id} not found (attempt {attempt + 1}/{max_retries + 1}), retrying in {wait_time}s")
                     await asyncio.sleep(wait_time)
                 else:
