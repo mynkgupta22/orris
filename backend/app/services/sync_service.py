@@ -553,21 +553,30 @@ def setup_drive_webhook(webhook_url: str, folder_id: str) -> dict:
         import uuid
         unique_suffix = str(uuid.uuid4())[:8]
         channel_id = f'orris-sync-{folder_id}-{unique_suffix}'
+
+        import time
+
+        expiration = int((time.time() + 7*24*3600) * 1000)  
         
         channel_body = {
             'id': channel_id,
             'type': 'web_hook',
             'address': webhook_url,
             'payload': True,
-            'token': os.getenv("GOOGLE_WEBHOOK_TOKEN", "orris-webhook-token")
+            'token': os.getenv("GOOGLE_WEBHOOK_TOKEN", "orris-webhook-token"),
+            'expiration' : expiration
         }
         
         logger.info(f"Setting up webhook channel: {channel_id}")
         logger.info(f"Webhook payload: {channel_body}")
         
         # Watch the folder for changes
-        response = service.files().watch(
-            fileId=folder_id,
+        # response = service.files().watch(
+        #     fileId=folder_id,
+        #     body=channel_body
+        # ).execute()
+        response = service.changes().watch(
+            pageToken=service.changes().getStartPageToken().execute()["startPageToken"],
             body=channel_body
         ).execute()
         

@@ -213,11 +213,11 @@ class RetrievalPipeline:
                                     DOCUMENTS:
                                     {context_text}
 
-                                    QUESTION:
-                                    {sanitized_query}
+                                    QUESTION: {sanitized_query}
 
-                                    FINAL ANSWER:
+                                    Now provide the FINAL ANSWER (just the answer, no extra Q&A pairs):
                                 """
+
 
                         output_generator = client.run(
                             model_id,
