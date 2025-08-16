@@ -221,9 +221,14 @@ class RetrievalPipeline:
 
                         output_generator = client.run(
                             model_id,
-                            input={"prompt": prompt, "max_new_tokens": 1024, "temperature": 0.1}
+                            input={"prompt": prompt, "max_new_tokens": 1024, "temperature": 0.1,"top_p": 0.9,"repetition_penalty": 1.1,
+                             "stop_sequences": ["QUESTION:", "Question:", "CONTEXT:", "Context:", "\n\nQuestion:"]}
                         )
-                        answer = "".join([str(part) for part in output_generator])
+                        raw_answer = "".join([str(part) for part in output_generator])
+    
+                        # Clean the response
+                        answer = clean_response(raw_answer, sanitized_query).strip()
+        
                         logger.info("Successfully received response from Replicate.")
                     except Exception as e:
                         logger.error(f"Failed to get response from Replicate API: {e}")
@@ -315,3 +320,22 @@ class RetrievalPipeline:
         except Exception as e:
             logger.error(f"Failed to get service status: {e}")
             return {"status": "unhealthy", "error": str(e)}
+
+    def clean_response(raw_response, original_question):
+        """Clean the model response to remove unwanted repetitions"""
+        lines = raw_response.strip().split('\n')
+        cleaned_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            # Skip lines that contain the original question or prompt artifacts
+            if (line.startswith('QUESTION:') or 
+                line.startswith('Now provide the FINAL ANSWER') or
+                line.startswith('ANSWER:') or
+                'FINAL ANSWER' in line.upper() or
+                line == original_question):
+                continue
+            if line:  # Only add non-empty lines
+                cleaned_lines.append(line)
+        
+        return '\n'.join(cleaned_lines)        
