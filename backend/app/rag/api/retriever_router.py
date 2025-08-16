@@ -97,7 +97,7 @@ async def query_documents(
             ip_address=client_ip,
             user_agent=user_agent 
         )
-        
+        logger.info(f"*************{rag_response.image_base64}")
         # Add assistant response to chat session
         chat_service.add_assistant_response(
             chat_session.session_id, 

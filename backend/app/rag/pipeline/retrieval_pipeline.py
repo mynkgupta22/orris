@@ -164,7 +164,7 @@ class RetrievalPipeline:
                         else:
                             logger.info(f"Top chunk {first_chunk_id} is not an image chunk, not returning image_base64")
                 except Exception as e:
-                    logger.warning(f"Failed to retrieve image_base64 from chunk {first_chunk_id}: {e}")
+                    logger.warning(f"Failed to retrieve image_base64 from chunk {first_chunk_id}==={image_base64}: {e}")
 
             # 7) Build context and call LLM (user message only contains user query)
             if not final_chunks:
@@ -278,7 +278,7 @@ class RetrievalPipeline:
                     "user_agent": user_agent,
                 }
             )
-
+            logger.info(f"@@@@@@@@@@@@@{image_base64}")
             # 8) Build minimal response
             return QueryResponse(
                 answer=answer,
