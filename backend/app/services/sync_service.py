@@ -201,7 +201,7 @@ async def process_drive_change_notification(
     
     try:
         # Handle folder change notifications (when files are added/removed from folders)
-        if changed == "children" and resource_state in ["update", "add"]:
+        if changed == "children" and resource_state in ["update", "add","change"]:
             logger.info(f"Detected folder children change for channel {channel_id}")
             # Look up the actual folder ID from channel ID
             folder_id = _get_folder_id_from_channel(channel_id)
@@ -213,7 +213,7 @@ async def process_drive_change_notification(
                 logger.warning(f"Could not find folder ID for channel {channel_id}")
         elif resource_state in ["remove", "trash"]:
             await _handle_document_deletion(resource_id)
-        elif resource_state in ["update", "add"]:
+        elif resource_state in ["update", "add","change"]:
             await _handle_document_upsert(resource_id)
         else:
             logger.warning(f"Unknown resource state: {resource_state}")
