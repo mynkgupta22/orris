@@ -321,7 +321,7 @@ class RetrievalPipeline:
             logger.error(f"Failed to get service status: {e}")
             return {"status": "unhealthy", "error": str(e)}
 
-    def clean_response(raw_response, original_question):
+    def clean_response(self,raw_response, original_question):
         """Clean the model response to remove unwanted repetitions"""
         lines = raw_response.strip().split('\n')
         cleaned_lines = []
