@@ -227,7 +227,7 @@ class RetrievalPipeline:
                         raw_answer = "".join([str(part) for part in output_generator])
     
                         # Clean the response
-                        answer = clean_response(raw_answer, sanitized_query).strip()
+                        answer = self.clean_response(raw_answer, sanitized_query).strip()
         
                         logger.info("Successfully received response from Replicate.")
                     except Exception as e:
