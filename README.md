@@ -25,7 +25,7 @@
 
 ## 🚀 Overview
 
-**Orris** is an enterprise-grade Document Intelligence Platform that transforms how organizations interact with their knowledge base. Built for **EVIDEV LLP**, Orris provides a sophisticated AI-powered chatbot interface that enables users to query company documents while maintaining strict access controls and data security.
+**Orris** is an enterprise-grade Document Intelligence Platform that transforms how organizations interact with their knowledge base. Orris provides a sophisticated AI-powered chatbot interface that enables users to query company documents while maintaining strict access controls and data security.
 
 The platform automatically synchronizes with Google Drive, processes documents using advanced NLP techniques, and provides contextual responses through a secure RAG (Retrieval-Augmented Generation) system.
 
