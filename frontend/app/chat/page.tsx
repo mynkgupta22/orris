@@ -66,9 +66,9 @@ export default function ChatInterface() {
 
   // Model options configuration
   const modelOptions = [
-    { value: 'default' as ModelType, label: 'Default', description: 'Standard model' },
-    { value: 'gemini' as ModelType, label: 'Gemini', description: 'Google Gemini model' },
-    { value: 'finllama' as ModelType, label: 'Fin-Llama', description: 'Financial Llama model' }
+    { value: 'default' as ModelType, label: 'Default', description: 'Standard model', disabled: false },
+    { value: 'gemini' as ModelType, label: 'Gemini', description: 'Google Gemini model', disabled: false },
+    { value: 'finllama' as ModelType, label: 'Fin-Llama', description: 'Financial Llama model (Coming Soon)', disabled: true }
   ]
 
   // Close dropdown when clicking outside
@@ -82,6 +82,13 @@ export default function ChatInterface() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Reset selected model if it's finllama (disabled)
+  useEffect(() => {
+    if (selectedModel === 'finllama') {
+      setSelectedModel('default')
+    }
+  }, [selectedModel])
 
   // Get use_finllama value based on selected model
   const getUseFinllama = (model: ModelType): boolean => {
@@ -746,17 +753,29 @@ export default function ChatInterface() {
                         <button
                           key={option.value}
                           onClick={() => {
-                            setSelectedModel(option.value)
-                            setModelDropdownOpen(false)
+                            if (!option.disabled) {
+                              setSelectedModel(option.value)
+                              setModelDropdownOpen(false)
+                            }
                           }}
+                          disabled={option.disabled}
                           className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
-                            selectedModel === option.value
+                            option.disabled
+                              ? 'cursor-not-allowed opacity-50 bg-gray-50 text-gray-400'
+                              : selectedModel === option.value
                               ? 'bg-blue-50 text-blue-700 border border-blue-200'
                               : 'hover:bg-gray-50 text-gray-700'
                           }`}
                         >
-                          <div className="font-medium text-sm">{option.label}</div>
-                          <div className="text-xs text-gray-500">{option.description}</div>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-medium text-sm">{option.label}</div>
+                              <div className="text-xs text-gray-500">{option.description}</div>
+                            </div>
+                            {option.disabled && (
+                              <Lock className="w-4 h-4 text-gray-400" />
+                            )}
+                          </div>
                         </button>
                       ))}
                     </div>
