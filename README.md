@@ -583,7 +583,7 @@ sync.*     - Document synchronization
 - **Discussions**: Community discussions and Q&A
 
 ### Contact Information
-- **Contributor 1**: Aditya Sebastian | [Email](mailto:aditya268244@gmil.com)
+- **Contributor 1**: Aditya Sebastian | [Email](mailto:aditya268244@gmail.com)
 - **Contributor 2**: Mayank Gupta | [Email](mailto:mayankmk22@gmail.com)
 
 
