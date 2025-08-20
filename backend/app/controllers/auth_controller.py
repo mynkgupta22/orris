@@ -107,13 +107,30 @@ class AuthController:
         response: Response,
         db: AsyncSession
     ) -> TokenResponse:
-        """User login with email and password"""
+        """User login with email and password with enhanced security"""
+        
+        client_ip = get_client_ip(request)
+        
+        # Validate email format
+        if not SecurityService.validate_email_format(user_login.email):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid email format"
+            )
+        
+        # Check if account is locked
+        if SecurityService.is_account_locked(user_login.email):
+            raise HTTPException(
+                status_code=status.HTTP_423_LOCKED,
+                detail="Account temporarily locked due to failed login attempts"
+            )
         
         # Find user
         result = await db.execute(select(User).where(User.email == user_login.email))
         user = result.scalar_one_or_none()
         
         if not user or not user.password:
+            SecurityService.record_failed_attempt(client_ip)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid credentials"
@@ -121,6 +138,11 @@ class AuthController:
         
         # Verify password
         if not SecurityService.verify_password(user_login.password, user.password):
+            SecurityService.record_failed_attempt(client_ip)
+            # Lock account after 5 failed attempts
+            failed_attempts = len(SecurityService._failed_login_attempts.get(client_ip, []))
+            if failed_attempts >= 4:  # This will be the 5th attempt
+                SecurityService.lock_account(user_login.email, duration_minutes=30)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid credentials"
@@ -132,6 +154,9 @@ class AuthController:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Account is not active"
             )
+        
+        # Clear failed attempts on successful login
+        SecurityService.clear_failed_attempts(client_ip)
         
         # Create tokens
         access_token = SecurityService.create_access_token({
