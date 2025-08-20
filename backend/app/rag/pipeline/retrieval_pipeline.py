@@ -28,6 +28,16 @@ SANITIZE_REGEXES: List[str] = [
     r"(?i)system\s*prompt",
     r"(?i)you are now",
     r"(?i)act as",
+    r"(?i)forget (?:previous|all)",
+    r"(?i)pretend (?:to be|you are)",
+    r"(?i)role\s*play",
+    r"(?i)new\s*instructions",
+    r"(?i)override\s*instructions",
+    r"(?i)jailbreak",
+    r"<\s*script[^>]*>.*?<\s*/\s*script\s*>",  # Script tags
+    r"<\s*iframe[^>]*>.*?<\s*/\s*iframe\s*>",  # Iframe tags
+    r"javascript\s*:",  # JavaScript protocol
+    r"data\s*:",  # Data protocol
 ]
 
 
@@ -73,10 +83,32 @@ class RetrievalPipeline:
             raise
 
     def _sanitize_query(self, query: str) -> str:
-        """Basic regex-based sanitization to mitigate prompt injection."""
-        sanitized = query
+        """Enhanced sanitization to mitigate prompt injection and other attacks."""
+        if not query:
+            return ""
+        
+        # First apply general input sanitization
+        from app.core.security import SecurityService
+        sanitized = SecurityService.sanitize_input(query, max_length=2000)
+        
+        # Apply specific patterns for RAG queries
         for pattern in SANITIZE_REGEXES:
-            sanitized = __import__("re").sub(pattern, "", sanitized)
+            sanitized = __import__("re").sub(pattern, "", sanitized, flags=__import__("re").IGNORECASE)
+        
+        # Remove excessive whitespace and normalize
+        sanitized = ' '.join(sanitized.split())
+        
+        # Additional checks for suspicious patterns
+        suspicious_patterns = [
+            "eval(", "exec(", "import ", "__import__",
+            "system(", "subprocess", "os.system",
+            "rm -rf", "del /", "format c:",
+        ]
+        
+        for pattern in suspicious_patterns:
+            if pattern.lower() in sanitized.lower():
+                sanitized = sanitized.replace(pattern, "")
+        
         return sanitized.strip()
 
     async def retrieve_and_answer(
