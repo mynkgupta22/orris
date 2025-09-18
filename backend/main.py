@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from app.core.config import settings
 from app.routers import auth, users, webhooks
+from app.core.database import async_engine, Base
 from app.rag.api.retriever_router import router as rag_router
 from app.services.webhook_renewal import run_webhook_renewal_service, ensure_webhook_initialized, migrate_json_to_database
 import os
@@ -80,6 +81,10 @@ async def keep_alive_task():
 async def startup_event():
     """Initialize webhooks if needed (this will create them in database)"""
     try:
+        async with async_engine.begin() as conn:
+
+        await conn.run_sync(Base.metadata.create_all)
+        print("✅ All tables created automatically!")
         webhook_initialized = await ensure_webhook_initialized()
         if webhook_initialized:
             logger.info("Webhook initialization completed during startup")
