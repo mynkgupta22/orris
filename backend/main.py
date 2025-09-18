@@ -83,7 +83,7 @@ async def startup_event():
     try:
         async with async_engine.begin() as conn:
 
-        await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(Base.metadata.create_all)
         print("✅ All tables created automatically!")
         webhook_initialized = await ensure_webhook_initialized()
         if webhook_initialized:
