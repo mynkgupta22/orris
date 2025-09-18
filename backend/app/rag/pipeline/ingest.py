@@ -13,8 +13,7 @@ backend_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_root))
 
 from app.rag.core.schemas import DocumentChunk, ChunkMeta
-from app.rag.core.loaders import load_file_to_elements
-from app.rag.core.chunking import chunk_elements
+from app.rag.core.loaders import load_file_to_chunks
 from app.rag.storage.index_qdrant import upsert_document_chunks
 from app.rag.integrations.drive import get_drive_service, walk_from_root, download_file, resolve_type_from_mime, classify_from_path
 from app.rag.core.extractors import extract_pdf_images, extract_docx_images
@@ -79,7 +78,6 @@ def main() -> None:
     print(f"[DEBUG] Vision enabled: {use_vision}, summarize_fn available: {summarize_fn is not None}, base64_fn available: {summarize_with_base64_fn is not None}")
 
     num_files = 0
-    total_elements = 0
     total_chunks = 0
     all_chunks: List[DocumentChunk] = []
     processed_docs = set()  # Track successfully processed document IDs
@@ -150,15 +148,13 @@ def main() -> None:
                 image_lookup = _lookup
 
             try:
-                elements = load_file_to_elements(str(dest), base_meta, summarize_image_fn=summarize_fn, summarize_image_with_base64_fn=summarize_with_base64_fn, image_lookup=image_lookup)
-                total_elements += len(elements)
-                chunks = chunk_elements(elements)
+                chunks = load_file_to_chunks(str(dest), base_meta, summarize_image_fn=summarize_fn)
                 total_chunks += len(chunks)
                 all_chunks.extend(chunks)
                 processed_docs.add(f.id)  # Track successful processing
                 
                 # Mark document as successfully processed (will be marked synced after indexing)
-                print(f"[SUCCESS] Processed {f.name}: {len(elements)} elements, {len(chunks)} chunks")
+                print(f"[SUCCESS] Processed {f.name}: {len(chunks)} chunks")
                 
             except Exception as e:
                 print(f"[WARN] Processing failed for {f.name}: {e}")
@@ -192,12 +188,10 @@ def main() -> None:
 
                 image_lookup = _lookup
             try:
-                elements = load_file_to_elements(str(p), base_meta, summarize_image_fn=summarize_fn, summarize_image_with_base64_fn=summarize_with_base64_fn, image_lookup=image_lookup)
+                chunks = load_file_to_chunks(str(p), base_meta, summarize_image_fn=summarize_fn)
             except Exception as e:
                 print(f"[WARN] Skipping {p}: {e}")
                 continue
-            total_elements += len(elements)
-            chunks = chunk_elements(elements)
             total_chunks += len(chunks)
             all_chunks.extend(chunks)
     else:
@@ -216,7 +210,7 @@ def main() -> None:
             synced_count += 1
 
     print(
-        f"Ingestion complete: files={num_files}, elements={total_elements}, chunks={total_chunks}, indexed={written}, synced={synced_count}"
+        f"Ingestion complete: files={num_files}, chunks={total_chunks}, indexed={written}, synced={synced_count}"
     )
 
 

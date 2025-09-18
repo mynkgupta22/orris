@@ -17,8 +17,7 @@ os.environ['CURL_CA_BUNDLE'] = certifi.where()
 from app.rag.integrations.drive import get_drive_service, resolve_type_from_mime, classify_from_path, download_file
 from app.rag.storage.sync_tracker import track_document_sync, mark_document_synced, mark_document_failed, document_needs_resync
 from app.rag.storage.index_qdrant import delete_document_chunks, upsert_document_chunks
-from app.rag.core.loaders import load_file_to_elements
-from app.rag.core.chunking import chunk_elements
+from app.rag.core.loaders import load_file_to_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -391,15 +390,14 @@ async def _process_single_document(service, file_metadata):
         try:
             # Use vision with base64 encoding if available
             if vision_available and summarize_image_with_base64:
-                elements = load_file_to_elements(str(dest_path), base_meta, summarize_image_with_base64_fn=summarize_image_with_base64)
+                chunks = load_file_to_chunks(str(dest_path), base_meta, summarize_image_fn=summarize_image_with_base64)
             else:
-                elements = load_file_to_elements(str(dest_path), base_meta)
-            chunks = chunk_elements(elements)
+                chunks = load_file_to_chunks(str(dest_path), base_meta)
             
             if chunks:
                 try:
                     written = upsert_document_chunks(chunks)
-                    logger.info(f"Processed {file_name}: {len(elements)} elements, {len(chunks)} chunks, {written} indexed")
+                    logger.info(f"Processed {file_name}: {len(chunks)} chunks, {written} indexed")
                     
                     # Mark as successfully synced
                     mark_document_synced(file_id)
