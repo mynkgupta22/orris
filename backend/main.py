@@ -76,15 +76,19 @@ async def keep_alive_task():
         # Wait for 14 minutes before the next ping (15 minutes is Render's timeout)
         await asyncio.sleep(14 * 60)
 
+@app.on_event("startup")
+async def startup_event_for_tables():    
+    print("Inside startup_event_for_tables method")
 
+    async with async_engine.begin() as conn:
+
+        await conn.run_sync(Base.metadata.create_all)
+    print("✅ All tables created automatically!")
+    
 @app.on_event("startup")
 async def startup_event():
     """Initialize webhooks if needed (this will create them in database)"""
     try:
-        async with async_engine.begin() as conn:
-
-            await conn.run_sync(Base.metadata.create_all)
-        print("✅ All tables created automatically!")
         webhook_initialized = await ensure_webhook_initialized()
         if webhook_initialized:
             logger.info("Webhook initialization completed during startup")
@@ -92,6 +96,7 @@ async def startup_event():
             logger.info("Webhook initialization skipped (missing env vars) or failed")
     except Exception as e:
         logger.error(f"Error during webhook initialization: {e}")
+
 
     # Start the webhook renewal service in the background
     asyncio.create_task(run_webhook_renewal_service())
