@@ -41,14 +41,13 @@ psycopg2-binary==2.9.10
 PyMuPDF
 qdrant_client==1.15.1
 railroad==0.5.0
-replicate
+# replicate
 simplejson==3.20.1
 SQLAlchemy==2.0.43
 tiktoken==0.10.0
 typing_extensions==4.14.1
-unstructured==0.18.11
 uvicorn==0.35.0
-unstructured[pdf]
+langchain_community
+python-docx
 zstandard==0.23.0
 langchain-google-genai
-unstructured[pdf]

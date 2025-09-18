@@ -1,323 +1,210 @@
-from __future__ import annotations
-
 from typing import Any, Dict, List, Optional, Callable
 from pathlib import Path
-import os
-
-# NOTE: We import unstructured partitioners lazily inside functions to provide
-# clearer error messages and to allow partial environments.
-
+from uuid import uuid4
+from datetime import datetime
 import pandas as pd
 
+try:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+except ImportError:
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-SUPPORTED_TYPES = {"pdf", "docx", "txt", "xlsx", "image"}
+try:
+    from langchain_community.document_loaders import PyMuPDFLoader
+except ImportError:
+    PyMuPDFLoader = None
+
+from app.rag.core.schemas import DocumentChunk, ChunkMeta
+
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
 
 
 def detect_type(path: str) -> str:
-    """Detect a supported source type from file extension.
-
-    Returns one of: "pdf" | "docx" | "txt" | "xlsx" | "image".
-    Raises ValueError for unsupported extensions.
-    """
-
+    """Detect file type from extension."""
     ext = Path(path).suffix.lower()
+    
     if ext == ".pdf":
         return "pdf"
-    if ext == ".docx":
+    elif ext == ".docx":
         return "docx"
-    if ext in {".txt", ".log"}:
+    elif ext in {".txt", ".log"}:
         return "txt"
-    if ext in {".xlsx", ".xls"}:
+    elif ext in {".xlsx", ".xls"}:
         return "xlsx"
-    if ext in IMAGE_EXTS:
+    elif ext in IMAGE_EXTS:
         return "image"
-    raise ValueError(f"Unsupported file extension: {ext}")
+    else:
+        raise ValueError(f"Unsupported file extension: {ext}")
 
 
-def _normalize_element(
-    *,
-    text: str,
-    base_meta: Dict[str, Any],
-    is_table: bool = False,
-    is_image: bool = False,
-    source_page: Optional[int] = None,
-) -> Dict[str, Any]:
-    meta = dict(base_meta)
-    meta.update(
-        {
-            "is_table": bool(is_table),
-            "is_image": bool(is_image),
-            "source_page": source_page,
-        }
-    )
-    return {"text": text, "meta": meta}
+def _create_chunk(text: str, base_meta: Dict[str, Any], chunk_index: int, 
+                 is_table: bool = False, is_image: bool = False, 
+                 source_page: Optional[int] = None) -> DocumentChunk:
+    """Create DocumentChunk directly."""
+    # Simple token count estimate
+    token_count = max(1, len(text) // 4) if text else 0
+    
+    meta = ChunkMeta(**{
+        **base_meta,
+        "chunk_id": str(uuid4()),
+        "chunk_index": chunk_index,
+        "is_table": is_table,
+        "is_image": is_image,
+        "source_page": source_page,
+        "token_count": token_count,
+        "ingested_at": datetime.utcnow(),
+    })
+    return DocumentChunk(text=text, meta=meta)
 
 
-def load_pdf(
-    path: str,
-    base_meta: Dict[str, Any],
-    *,
-    summarize_image_fn: Optional[Callable[[str], str]] = None,
-    summarize_image_with_base64_fn: Optional[Callable[[str], tuple[str, str]]] = None,
-    image_lookup: Optional[Callable[[int], List[str]]] = None,
-) -> List[Dict[str, Any]]:
-    try:
-        from unstructured.partition.pdf import partition_pdf  # type: ignore
-    except Exception as e:
-        raise RuntimeError(
-            "unstructured.partition.pdf import failed. Install 'unstructured[pdf]' or 'unstructured[all-docs]'. "
-            f"Underlying error: {e}"
-        )
+def load_pdf(path: str, base_meta: Dict[str, Any]) -> List[DocumentChunk]:
+    """Load PDF and split into chunks."""
+    if PyMuPDFLoader is None:
+        raise RuntimeError("PyMuPDFLoader is required for PDF files")
 
-    elements = partition_pdf(
-        filename=path,
-        strategy="fast",
-        chunking_strategy="by_title",
-        max_characters=2000,
-        new_after_n_chars=1800,
-        overlap=200,
-        combine_text_under_n_chars=200,
-        infer_table_structure=True,
-    )
+    loader = PyMuPDFLoader(path)
+    docs = loader.load()
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 
-    normalized: List[Dict[str, Any]] = []
-    for el in elements:
-        category = getattr(el, "category", "") or getattr(el, "type", "")
-        page_number = getattr(el, "page_number", None)
-        text = getattr(el, "text", "") or ""
-        is_table = category == "Table"
-        is_image = category in {"Image", "Figure"}
-        
-        # Initialize image_base64 outside the image processing block
-        image_base64: Optional[str] = None
-
-        if is_image:
-            summary: Optional[str] = None
+    chunks = []
+    chunk_index = 0
+    for idx, doc in enumerate(docs):
+        text = getattr(doc, "page_content", "")
+        if not text.strip():
+            continue
             
-            if summarize_image_with_base64_fn is not None:
-                try:
-                    # Prefer extracted image if available for this page
-                    img_paths = image_lookup(page_number) if (image_lookup and page_number) else []
-                    target_img = img_paths[0] if img_paths else path
-                    summary, image_base64 = summarize_image_with_base64_fn(target_img)
-                    print(f"[DEBUG] Generated base64 for image: {len(image_base64) if image_base64 else 0} chars")
-                except Exception as e:
-                    print(f"[DEBUG] Failed to generate base64: {e}")
-                    summary = None
-                    image_base64 = None
-            elif summarize_image_fn is not None:
-                try:
-                    # Prefer extracted image if available for this page
-                    img_paths = image_lookup(page_number) if (image_lookup and page_number) else []
-                    target_img = img_paths[0] if img_paths else path
-                    summary = summarize_image_fn(target_img)
-                except Exception:
-                    summary = None
-            if summary and summary.strip():
-                text = summary
-            elif not text.strip():
-                # Fallback placeholder for images without text
-                text = f"Image: {base_meta.get('source_doc_name', Path(path).name)}"
-
-        if not text.strip() and not is_table and not is_image:
-            continue
-
-        elem = _normalize_element(
-            text=text,
-            base_meta=base_meta,
-            is_table=is_table,
-            is_image=is_image,
-            source_page=page_number,
-        )
-        if is_image:
-            meta_with_summary = dict(elem["meta"])  # shallow copy
-            meta_with_summary["image_summary"] = text
-            # record the first extracted image path, if any
-            if image_lookup and page_number:
-                img_paths = image_lookup(page_number)
-                if img_paths:
-                    meta_with_summary["image_url"] = img_paths[0]
-            # Store base64 encoding if available
-            if image_base64:
-                meta_with_summary["image_base64"] = image_base64
-                print(f"[DEBUG] Added image_base64 to metadata: {len(image_base64)} chars")
-            else:
-                print("[DEBUG] No image_base64 to add to metadata")
-            elem["meta"] = meta_with_summary
-        normalized.append(elem)
-    return normalized
+        text_chunks = splitter.split_text(text)
+        for chunk_text in text_chunks:
+            if chunk_text.strip():
+                chunks.append(_create_chunk(
+                    text=chunk_text, base_meta=base_meta, 
+                    chunk_index=chunk_index, source_page=idx + 1
+                ))
+                chunk_index += 1
+    return chunks
 
 
-def load_docx(path: str, base_meta: Dict[str, Any]) -> List[Dict[str, Any]]:
+def load_docx(path: str, base_meta: Dict[str, Any]) -> List[DocumentChunk]:
+    """Load DOCX file and split into chunks."""
     try:
-        from unstructured.partition.docx import partition_docx  # type: ignore
-    except Exception as e:
-        raise RuntimeError(
-            "unstructured.partition.docx import failed. Install 'unstructured[docx]' or 'unstructured[all-docs]'. "
-            f"Underlying error: {e}"
-        )
-
-    try:
-        elements = partition_docx(filename=path)
-    except Exception as e:
-        raise RuntimeError(
-            "Failed to parse DOCX with unstructured. Consider installing 'unstructured[docx]' or 'all-docs'. "
-            f"Error: {e}"
-        )
-    normalized: List[Dict[str, Any]] = []
-    for el in elements:
-        category = getattr(el, "category", "") or getattr(el, "type", "")
-        text = getattr(el, "text", "") or ""
-        is_table = category == "Table"
-
-        if not text.strip() and not is_table:
-            continue
-
-        normalized.append(
-            _normalize_element(
-                text=text,
-                base_meta=base_meta,
-                is_table=is_table,
-                is_image=False,
-                source_page=None,
-            )
-        )
-    return normalized
-
-
-def load_txt(path: str, base_meta: Dict[str, Any]) -> List[Dict[str, Any]]:
-    try:
-        from langchain_text_splitters import RecursiveCharacterTextSplitter
+        from docx import Document
+        doc = Document(path)
+        text = "\n\n".join([p.text for p in doc.paragraphs if p.text.strip()])
     except ImportError:
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
+        # Fallback to plain text
+        text = Path(path).read_text(encoding="utf-8", errors="ignore")
+    
+    if not text.strip():
+        return []
+    
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    text_chunks = splitter.split_text(text)
+    
+    chunks = []
+    for i, chunk_text in enumerate(text_chunks):
+        if chunk_text.strip():
+            chunks.append(_create_chunk(
+                text=chunk_text, base_meta=base_meta, chunk_index=i
+            ))
+    return chunks
 
-    p = Path(path)
+
+def load_txt(path: str, base_meta: Dict[str, Any]) -> List[DocumentChunk]:
+    """Load text file and split into chunks."""
     try:
-        text = p.read_text(encoding="utf-8")
+        text = Path(path).read_text(encoding="utf-8")
     except UnicodeDecodeError:
-        text = p.read_text(encoding="latin-1")
+        text = Path(path).read_text(encoding="latin-1")
 
     if not text.strip():
         return []
 
-    # Initialize the text splitter with same parameters as PDF
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=2000,
-        chunk_overlap=200,
-        length_function=len,
-        separators=["\n\n", "\n", " ", ""]
-    )
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    text_chunks = splitter.split_text(text)
     
-    # Split the text into chunks
-    chunks = text_splitter.split_text(text)
-    
-    # Convert chunks to normalized elements
-    normalized = []
-    for i, chunk in enumerate(chunks):
-        if chunk.strip():
-            normalized.append(
-                _normalize_element(
-                    text=chunk,
-                    base_meta=base_meta,
-                    is_table=False,
-                    is_image=False,
-                    source_page=None,
-                )
-            )
-    
-    return normalized
+    chunks = []
+    for i, chunk_text in enumerate(text_chunks):
+        if chunk_text.strip():
+            chunks.append(_create_chunk(
+                text=chunk_text, base_meta=base_meta, chunk_index=i
+            ))
+    return chunks
 
 
-def load_xlsx(path: str, base_meta: Dict[str, Any]) -> List[Dict[str, Any]]:
-    # Minimal approach: use pandas to read each sheet and serialize to CSV-like text
-    book = pd.read_excel(path, sheet_name=None)  # dict of sheet_name -> DataFrame
-    normalized: List[Dict[str, Any]] = []
-    for sheet_name, df in book.items():
+def load_xlsx(path: str, base_meta: Dict[str, Any]) -> List[DocumentChunk]:
+    """Load Excel file and split into chunks."""
+    sheets = pd.read_excel(path, sheet_name=None)
+    chunks = []
+    chunk_index = 0
+    
+    for sheet_name, df in sheets.items():
         if df.empty:
             continue
-        # Convert to CSV-like text for MVP (markdown optional later)
-        csv_text = df.to_csv(index=False)
-        text = f"Sheet: {sheet_name}\n{csv_text}"
-        meta = dict(base_meta)
-        meta.update({"is_table": True, "is_image": False, "source_page": None, "sheet_name": sheet_name})
-        normalized.append({"text": text, "meta": meta})
-    return normalized
-
-
-def load_image(
-    path: str,
-    base_meta: Dict[str, Any],
-    *,
-    summarize_image_fn: Optional[Callable[[str], str]] = None,
-    summarize_image_with_base64_fn: Optional[Callable[[str], tuple[str, str]]] = None,
-) -> List[Dict[str, Any]]:
-    # Summarize via callback if provided; otherwise placeholder text
-    name = base_meta.get("source_doc_name", Path(path).name)
-    summary: Optional[str] = None
-    image_base64: Optional[str] = None
-    
-    if summarize_image_with_base64_fn is not None:
-        try:
-            summary, image_base64 = summarize_image_with_base64_fn(path)
-            print(f"[DEBUG] Generated base64 for standalone image: {len(image_base64) if image_base64 else 0} chars")
-        except Exception as e:
-            print(f"[DEBUG] Failed to generate base64 for standalone image: {e}")
-            summary = None
-            image_base64 = None
-    elif summarize_image_fn is not None:
-        try:
-            summary = summarize_image_fn(path)
-        except Exception:
-            summary = None
             
-    text = summary if (summary and summary.strip()) else f"Image: {name}"
-    elem = _normalize_element(
-        text=text,
-        base_meta=base_meta,
-        is_table=False,
-        is_image=True,
-        source_page=None,
-    )
-    meta_with_summary = dict(elem["meta"])  # shallow copy
-    meta_with_summary["image_summary"] = text
-    meta_with_summary["image_url"] = str(Path(path))
-    # Store base64 encoding if available
-    if image_base64:
-        meta_with_summary["image_base64"] = image_base64
-        print(f"[DEBUG] Added image_base64 to standalone image metadata: {len(image_base64)} chars")
+        # Split into 10-row chunks
+        for start in range(0, len(df), 10):
+            chunk_df = df.iloc[start:start + 10]
+            text = f"Sheet: {sheet_name}\n{chunk_df.to_csv(index=False)}"
+            
+            # Add sheet_name to base_meta for this chunk
+            meta_with_sheet = dict(base_meta)
+            meta_with_sheet["sheet_name"] = sheet_name
+            
+            chunks.append(_create_chunk(
+                text=text, base_meta=meta_with_sheet, 
+                chunk_index=chunk_index, is_table=True
+            ))
+            chunk_index += 1
+    
+    return chunks
+
+
+def load_image(path: str, base_meta: Dict[str, Any], 
+               summarize_fn: Optional[Callable[[str], str]] = None) -> List[DocumentChunk]:
+    """Load image file."""
+    name = Path(path).name
+    
+    # Try to get summary if function provided
+    if summarize_fn:
+        try:
+            text = summarize_fn(path)
+        except Exception:
+            text = f"Image: {name}"
     else:
-        print("[DEBUG] No image_base64 to add to standalone image metadata")
-    elem["meta"] = meta_with_summary
-    return [elem]
+        text = f"Image: {name}"
+    
+    # Add image_url to base_meta
+    meta_with_image = dict(base_meta)
+    meta_with_image["image_url"] = str(Path(path))
+    meta_with_image["image_summary"] = text
+    
+    chunk = _create_chunk(
+        text=text, base_meta=meta_with_image, 
+        chunk_index=0, is_image=True
+    )
+    return [chunk]
 
 
-def load_file_to_elements(
-    path: str,
-    base_meta: Dict[str, Any],
-    *,
-    summarize_image_fn: Optional[Callable[[str], str]] = None,
-    summarize_image_with_base64_fn: Optional[Callable[[str], tuple[str, str]]] = None,
-    image_lookup: Optional[Callable[[int], List[str]]] = None,
-) -> List[Dict[str, Any]]:
-    """Route a file to the proper loader and return normalized elements.
-
-    The returned list items have shape: {"text": str, "meta": dict}
-    where meta minimally contains flags: is_table, is_image, source_page, and
-    inherits keys from base_meta.
-    """
-
-    dtype = detect_type(path)
-    if dtype == "pdf":
-        return load_pdf(path, base_meta, summarize_image_fn=summarize_image_fn, summarize_image_with_base64_fn=summarize_image_with_base64_fn, image_lookup=image_lookup)
-    if dtype == "docx":
+def load_file_to_chunks(path: str, base_meta: Dict[str, Any], 
+                       summarize_image_fn: Optional[Callable[[str], str]] = None) -> List[DocumentChunk]:
+    """Load file and return DocumentChunk objects."""
+    file_type = detect_type(path)
+    
+    if file_type == "pdf":
+        return load_pdf(path, base_meta)
+    elif file_type == "docx":
         return load_docx(path, base_meta)
-    if dtype == "txt":
+    elif file_type == "txt":
         return load_txt(path, base_meta)
-    if dtype == "xlsx":
+    elif file_type == "xlsx":
         return load_xlsx(path, base_meta)
-    if dtype == "image":
-        return load_image(path, base_meta, summarize_image_fn=summarize_image_fn, summarize_image_with_base64_fn=summarize_image_with_base64_fn)
-    raise ValueError(f"Unsupported detected type: {dtype}")
+    elif file_type == "image":
+        return load_image(path, base_meta, summarize_image_fn)
+    else:
+        raise ValueError(f"Unsupported file type: {file_type}")
+
+
+# Backward compatibility
+load_file_to_elements = load_file_to_chunks
 
 
