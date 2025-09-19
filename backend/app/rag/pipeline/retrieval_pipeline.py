@@ -236,7 +236,13 @@ class RetrievalPipeline:
                 else:
                     # Logic for Gemini (following the OpenAI format)
                     try:
-                        logger.info(f"conetxttttttttt---{context_text}")
+                        logger.info(f"conetxttttttttt---")
+                        import os
+                        api_key = os.getenv("GOOGLE_API_KEY")  # or whatever env var you're using
+                        if api_key:
+                            logger.info(f"Using Gemini API key: {api_key[:4]}...{api_key[-4:]}")
+                        else:
+                            logger.error("No Gemini API key found in environment variables!")
                         system_text = f"""
                                 You are a secure assistant that answers questions based on the provided context.
 
