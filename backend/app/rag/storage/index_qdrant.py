@@ -111,7 +111,7 @@ def upsert_document_chunks(
                 print("[DEBUG] Storing image chunk but no base64 in payload")
             
             payload.setdefault("embedding_model", emb.model_name)
-            payload.setdefault("embedding_dim", emb.dimension)
+            payload.setdefault("embedding_dim", getattr(emb, "dimension", 1024))
             payload.setdefault("pipeline_version", os.getenv("PIPELINE_VERSION", "0.1.0"))
             payload["text"] = batch[j].text  # ensure text is retrievable
             payload.setdefault("doc_url", payload.get("source_doc_url"))  # alias for retrieval
