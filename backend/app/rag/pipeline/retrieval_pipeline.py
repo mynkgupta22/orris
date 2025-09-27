@@ -46,8 +46,8 @@ class RetrievalPipeline:
         # --- Change End ---
 
         # LLM
-        self.gemini_chat = ChatGoogleGenerativeAI(model="gemini-2.5", temperature=0.1)
-        logger.info("Initialized Gemini client with model: gemini-2.5")
+        self.openai_chat = ChatOpenAI(model_name="gpt-4",temperature=0.1)        
+        logger.info("Initialized Openai client with model: openai")
 
     def _init_qdrant_client(self) -> QdrantClient:
         try:
@@ -238,9 +238,9 @@ class RetrievalPipeline:
                     try:
                         logger.info(f"conetxttttttttt---")
                         import os
-                        api_key = os.getenv("GOOGLE_API_KEY")  # or whatever env var you're using
+                        api_key = os.getenv("OPENAI_API_KEY")  # or whatever env var you're using
                         if api_key:
-                            logger.info(f"Using Gemini API key: {api_key[:4]}...{api_key[-4:]}")
+                            logger.info(f"Using OPENAI API key: {api_key[:4]}...{api_key[-4:]}")
                         else:
                             logger.error("No Gemini API key found in environment variables!")
                         system_text = f"""
@@ -261,7 +261,7 @@ class RetrievalPipeline:
                         
                         user_text = f"Question: {sanitized_query}"
                 
-                        llm_resp = self.gemini_chat.invoke([
+                        llm_resp = self.openai_chat.invoke([
                             SystemMessage(content=system_text),
                             HumanMessage(content=user_text),
                         ])
