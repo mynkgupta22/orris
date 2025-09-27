@@ -46,8 +46,8 @@ class RetrievalPipeline:
         # --- Change End ---
 
         # LLM
-        self.gemini_chat = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.1)
-        logger.info("Initialized Gemini client with model: gemini-1.5-flash")
+        self.gemini_chat = ChatGoogleGenerativeAI(model="gemini-2.5", temperature=0.1)
+        logger.info("Initialized Gemini client with model: gemini-2.5")
 
     def _init_qdrant_client(self) -> QdrantClient:
         try:
